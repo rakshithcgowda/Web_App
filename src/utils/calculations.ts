@@ -1,4 +1,4 @@
-import type { BQCData, EMDThreshold } from '@/types';
+import type { BQCData } from '@/types';
 import { EMD_THRESHOLDS } from './constants';
 
 /**

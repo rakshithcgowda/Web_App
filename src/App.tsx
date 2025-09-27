@@ -1,4 +1,3 @@
-import React from 'react';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { AuthPage } from '@/pages/AuthPage';
 import { Dashboard } from '@/pages/Dashboard';
