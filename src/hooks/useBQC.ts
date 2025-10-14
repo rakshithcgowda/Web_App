@@ -6,7 +6,6 @@ import { validateBQCData } from '@/utils/validation';
 import { 
   calculateAnnualizedValue, 
   calculateTurnoverRequirement,
-  calculateSupplyingCapacity,
   calculateExperienceRequirements,
   calculateEMD,
   calculateLotWiseTotals
@@ -23,10 +22,65 @@ export function useBQC() {
     setBQCData(prevData => {
       const newData = { ...prevData, ...updates };
       
+      // Ensure evaluation methodology defaults to LCS if not set
+      if (!newData.evaluationMethodology) {
+        newData.evaluationMethodology = 'LCS';
+      }
+      
+      // Handle methodology transition
+      if (updates.evaluationMethodology) {
+        const newMethodology = updates.evaluationMethodology;
+        const oldMethodology = prevData.evaluationMethodology;
+        
+        // If switching from LCS to Lot-wise, clear main CEC values and ensure lots array exists
+        if (oldMethodology === 'LCS' && newMethodology === 'Lot-wise') {
+          newData.cecEstimateInclGst = 0;
+          newData.cecEstimateExclGst = 0;
+          newData.lots = newData.lots || [];
+        }
+        
+        // If switching from Lot-wise to LCS, clear lots array and ensure CEC values are set
+        if (oldMethodology === 'Lot-wise' && newMethodology === 'LCS') {
+          newData.lots = [];
+          // Keep existing CEC values or set defaults
+          if (newData.cecEstimateInclGst === 0 && newData.cecEstimateExclGst === 0) {
+            newData.cecEstimateInclGst = 0;
+            newData.cecEstimateExclGst = 0;
+          }
+        }
+      }
+      
+      // Handle tender type transition
+      if (updates.tenderType) {
+        const newTenderType = updates.tenderType;
+        const oldTenderType = prevData.tenderType;
+        
+        // If switching from Goods to Service/Works, clear Goods-specific fields
+        if (oldTenderType === 'Goods' && (newTenderType === 'Service' || newTenderType === 'Works')) {
+          newData.manufacturerTypes = [];
+          newData.deliveryPeriod = '';
+          newData.warrantyPeriod = '';
+          // Initialize Service-specific fields if not already set
+          if (!newData.similarWorkDefinition) {
+            newData.similarWorkDefinition = '';
+          }
+        }
+        
+        // If switching from Service/Works to Goods, clear Service/Works-specific fields
+        if ((oldTenderType === 'Service' || oldTenderType === 'Works') && newTenderType === 'Goods') {
+          newData.similarWorkDefinition = '';
+          newData.mseRelaxation = false;
+          // Initialize Goods-specific fields if not already set
+          if (!newData.manufacturerTypes || newData.manufacturerTypes.length === 0) {
+            newData.manufacturerTypes = [];
+          }
+        }
+      }
+      
       // Recalculate derived values
       newData.annualizedValue = calculateAnnualizedValue(
         newData.cecEstimateExclGst, 
-        newData.contractPeriodYears
+        parseInt(newData.contractPeriodMonths)
       );
 
       return newData;
@@ -37,16 +91,12 @@ export function useBQC() {
   const getCalculatedValues = useCallback(() => {
     const lotWiseTotals = calculateLotWiseTotals(bqcData);
     const turnoverReq = calculateTurnoverRequirement(bqcData);
-    const supplyingCapacity = calculateSupplyingCapacity(
-      bqcData.supplyingCapacity, 
-      bqcData.mseRelaxation
-    );
     const experienceReq = calculateExperienceRequirements(bqcData);
     const emdAmount = calculateEMD(lotWiseTotals.totalCECInclGst, bqcData.tenderType); // Uses total CEC including GST for EMD
 
     return {
       turnoverRequirement: turnoverReq,
-      supplyingCapacity,
+      supplyingCapacity: bqcData.supplyingCapacity,
       experienceRequirements: experienceReq,
       emdAmount,
       pastPerformance: lotWiseTotals.totalPastPerformance,
@@ -164,6 +214,9 @@ export function useBQC() {
 
     setIsLoading(true);
     setError(null);
+    
+    // Start timing the generation process
+    const startTime = Date.now();
 
     try {
       const request: DocumentGenerationRequest = {
@@ -173,6 +226,10 @@ export function useBQC() {
 
       const response = await bqcService.generateDocument(request);
       if (response.success && response.data) {
+        // Calculate generation time
+        const endTime = Date.now();
+        const generationTimeMs = endTime - startTime;
+        
         // Download the document directly from blob
         const { blob, filename } = response.data;
         
@@ -186,7 +243,7 @@ export function useBQC() {
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
         
-        return { success: true };
+        return { success: true, generationTimeMs };
       } else {
         setError(response.message || 'Failed to generate document');
         return { success: false, message: response.message };

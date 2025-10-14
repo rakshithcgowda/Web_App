@@ -53,19 +53,23 @@ class Database {
         user_id INTEGER NOT NULL,
         ref_number TEXT NOT NULL,
         group_name TEXT,
-        item_name TEXT,
-        project_name TEXT,
+        subject TEXT,
         tender_description TEXT,
         pr_reference TEXT,
         tender_type TEXT,
+        evaluation_methodology TEXT,
         cec_estimate_incl_gst REAL,
         cec_date DATE,
         cec_estimate_excl_gst REAL,
+        lots TEXT,
+        quantity_supplied REAL,
         budget_details TEXT,
         tender_platform TEXT,
         scope_of_work TEXT,
-        contract_period_years REAL,
+        contract_period_months TEXT,
+        contract_duration_years REAL,
         delivery_period TEXT,
+        bid_validity_period TEXT,
         warranty_period TEXT,
         amc_period TEXT,
         payment_terms TEXT,
@@ -77,10 +81,15 @@ class Database {
         escalation_clause TEXT,
         divisibility TEXT,
         performance_security INTEGER,
+        has_performance_security INTEGER,
         proposed_by TEXT,
+        proposed_by_designation TEXT,
         recommended_by TEXT,
+        recommended_by_designation TEXT,
         concurred_by TEXT,
+        concurred_by_designation TEXT,
         approved_by TEXT,
+        approved_by_designation TEXT,
         amc_value REAL,
         has_amc INTEGER,
         correction_factor REAL,
@@ -88,11 +97,33 @@ class Database {
         o_m_period TEXT,
         has_om INTEGER,
         additional_details TEXT,
+        note_to TEXT,
+        commercial_evaluation_method TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users (id)
       )
     `);
+
+    // Add migration for contract_duration_years column if it doesn't exist
+    this.db.run(`
+      ALTER TABLE bqc_data ADD COLUMN contract_duration_years REAL DEFAULT 1
+    `, (err) => {
+      // Ignore error if column already exists
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding contract_duration_years column:', err);
+      }
+    });
+
+    // Add migration for bid_validity_period column if it doesn't exist
+    this.db.run(`
+      ALTER TABLE bqc_data ADD COLUMN bid_validity_period TEXT
+    `, (err) => {
+      // Ignore error if column already exists
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding bid_validity_period column:', err);
+      }
+    });
   }
 
   // User operations
@@ -157,42 +188,44 @@ class Database {
       this.db.get(
         'SELECT id FROM bqc_data WHERE user_id = ? AND ref_number = ?',
         [userId, bqcData.refNumber],
-        (err, existingRecord) => {
+        (err, existingRecord: any) => {
           if (err) {
             reject(err);
             return;
           }
 
           const manufacturerTypesJson = JSON.stringify(bqcData.manufacturerTypes || []);
+          const commercialEvaluationMethodJson = JSON.stringify(bqcData.commercialEvaluationMethod || []);
           
           if (existingRecord) {
             // Update existing record
             this.db.run(`
               UPDATE bqc_data SET
-                group_name = ?, tender_description = ?, pr_reference = ?,
-                tender_type = ?, cec_estimate_incl_gst = ?, cec_date = ?,
-                cec_estimate_excl_gst = ?, budget_details = ?, tender_platform = ?,
-                scope_of_work = ?, contract_period_years = ?, delivery_period = ?,
+                group_name = ?, subject = ?, tender_description = ?, pr_reference = ?,
+                tender_type = ?, evaluation_methodology = ?, cec_estimate_incl_gst = ?, cec_date = ?,
+                cec_estimate_excl_gst = ?, lots = ?, quantity_supplied = ?, budget_details = ?, tender_platform = ?,
+                scope_of_work = ?, contract_period_months = ?, contract_duration_years = ?, delivery_period = ?, bid_validity_period = ?,
                 warranty_period = ?, amc_period = ?, payment_terms = ?,
                 manufacturer_types = ?, supplying_capacity = ?, mse_relaxation = ?,
                 similar_work_definition = ?, annualized_value = ?, escalation_clause = ?,
-                divisibility = ?, performance_security = ?, proposed_by = ?,
-                recommended_by = ?, concurred_by = ?, approved_by = ?,
+                divisibility = ?, performance_security = ?, has_performance_security = ?, proposed_by = ?, proposed_by_designation = ?,
+                recommended_by = ?, recommended_by_designation = ?, concurred_by = ?, concurred_by_designation = ?, approved_by = ?, approved_by_designation = ?,
                 amc_value = ?, has_amc = ?, correction_factor = ?,
-                additional_details = ?, updated_at = CURRENT_TIMESTAMP
+                o_m_value = ?, o_m_period = ?, has_om = ?, additional_details = ?, note_to = ?, commercial_evaluation_method = ?, updated_at = CURRENT_TIMESTAMP
               WHERE id = ?
             `, [
-              bqcData.groupName, bqcData.tenderDescription, bqcData.prReference,
-              bqcData.tenderType, bqcData.cecEstimateInclGst, bqcData.cecDate,
-              bqcData.cecEstimateExclGst, bqcData.budgetDetails, bqcData.tenderPlatform,
-              bqcData.scopeOfWork, bqcData.contractPeriodYears, bqcData.deliveryPeriod,
+              bqcData.groupName, bqcData.subject, bqcData.tenderDescription, bqcData.prReference,
+              bqcData.tenderType, bqcData.evaluationMethodology, bqcData.cecEstimateInclGst, bqcData.cecDate,
+              bqcData.cecEstimateExclGst, JSON.stringify(bqcData.lots || []), bqcData.quantitySupplied, bqcData.budgetDetails, bqcData.tenderPlatform,
+              bqcData.scopeOfWork, bqcData.contractPeriodMonths, bqcData.contractDurationYears, bqcData.deliveryPeriod, bqcData.bidValidityPeriod,
               bqcData.warrantyPeriod, bqcData.amcPeriod, bqcData.paymentTerms,
               manufacturerTypesJson, bqcData.supplyingCapacity, bqcData.mseRelaxation ? 1 : 0,
               bqcData.similarWorkDefinition, bqcData.annualizedValue, bqcData.escalationClause,
-              bqcData.divisibility, bqcData.performanceSecurity, bqcData.proposedBy,
-              bqcData.recommendedBy, bqcData.concurredBy, bqcData.approvedBy,
+              bqcData.divisibility, bqcData.performanceSecurity, bqcData.hasPerformanceSecurity ? 1 : 0, bqcData.proposedBy, bqcData.proposedByDesignation,
+              bqcData.recommendedBy, bqcData.recommendedByDesignation, bqcData.concurredBy, bqcData.concurredByDesignation, bqcData.approvedBy, bqcData.approvedByDesignation,
               bqcData.amcValue, bqcData.hasAmc ? 1 : 0, bqcData.correctionFactor,
-              bqcData.additionalDetails, existingRecord.id
+              bqcData.omValue || 0, bqcData.omPeriod || '', bqcData.hasOm ? 1 : 0,
+              bqcData.additionalDetails, bqcData.noteTo, commercialEvaluationMethodJson, existingRecord.id
             ], function(err) {
               if (err) {
                 reject(err);
@@ -204,28 +237,29 @@ class Database {
             // Insert new record
             this.db.run(`
               INSERT INTO bqc_data (
-                user_id, ref_number, group_name, tender_description, pr_reference,
-                tender_type, cec_estimate_incl_gst, cec_date, cec_estimate_excl_gst,
-                budget_details, tender_platform, scope_of_work, contract_period_years,
-                delivery_period, warranty_period, amc_period, payment_terms,
+                user_id, ref_number, group_name, subject, tender_description, pr_reference,
+                tender_type, evaluation_methodology, cec_estimate_incl_gst, cec_date, cec_estimate_excl_gst,
+                lots, quantity_supplied, budget_details, tender_platform,                 scope_of_work, contract_period_months, contract_duration_years,
+                delivery_period, bid_validity_period, warranty_period, amc_period, payment_terms,
                 manufacturer_types, supplying_capacity, mse_relaxation,
                 similar_work_definition, annualized_value, escalation_clause,
-                divisibility, performance_security, proposed_by, recommended_by,
-                concurred_by, approved_by, amc_value, has_amc, correction_factor,
-                additional_details
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                divisibility, performance_security, has_performance_security, proposed_by, proposed_by_designation, recommended_by, recommended_by_designation,
+                concurred_by, concurred_by_designation, approved_by, approved_by_designation, amc_value, has_amc, correction_factor,
+                o_m_value, o_m_period, has_om, additional_details, note_to, commercial_evaluation_method
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
-              userId, bqcData.refNumber, bqcData.groupName, bqcData.tenderDescription,
-              bqcData.prReference, bqcData.tenderType, bqcData.cecEstimateInclGst,
-              bqcData.cecDate, bqcData.cecEstimateExclGst, bqcData.budgetDetails,
-              bqcData.tenderPlatform, bqcData.scopeOfWork, bqcData.contractPeriodYears,
-              bqcData.deliveryPeriod, bqcData.warrantyPeriod, bqcData.amcPeriod,
+              userId, bqcData.refNumber, bqcData.groupName, bqcData.subject, bqcData.tenderDescription,
+              bqcData.prReference, bqcData.tenderType, bqcData.evaluationMethodology, bqcData.cecEstimateInclGst,
+              bqcData.cecDate, bqcData.cecEstimateExclGst, JSON.stringify(bqcData.lots || []), bqcData.quantitySupplied, bqcData.budgetDetails,
+              bqcData.tenderPlatform, bqcData.scopeOfWork, bqcData.contractPeriodMonths, bqcData.contractDurationYears,
+              bqcData.deliveryPeriod, bqcData.bidValidityPeriod, bqcData.warrantyPeriod, bqcData.amcPeriod,
               bqcData.paymentTerms, manufacturerTypesJson, bqcData.supplyingCapacity,
               bqcData.mseRelaxation ? 1 : 0, bqcData.similarWorkDefinition,
               bqcData.annualizedValue, bqcData.escalationClause, bqcData.divisibility,
-              bqcData.performanceSecurity, bqcData.proposedBy, bqcData.recommendedBy,
-              bqcData.concurredBy, bqcData.approvedBy, bqcData.amcValue,
-              bqcData.hasAmc ? 1 : 0, bqcData.correctionFactor, bqcData.additionalDetails
+              bqcData.performanceSecurity, bqcData.hasPerformanceSecurity ? 1 : 0, bqcData.proposedBy, bqcData.proposedByDesignation, bqcData.recommendedBy, bqcData.recommendedByDesignation,
+              bqcData.concurredBy, bqcData.concurredByDesignation, bqcData.approvedBy, bqcData.approvedByDesignation, bqcData.amcValue,
+              bqcData.hasAmc ? 1 : 0, bqcData.correctionFactor, bqcData.omValue || 0,
+              bqcData.omPeriod || '', bqcData.hasOm ? 1 : 0, bqcData.additionalDetails, bqcData.noteTo, commercialEvaluationMethodJson
             ], function(err) {
               if (err) {
                 reject(err);
@@ -244,7 +278,7 @@ class Database {
       this.db.get(
         'SELECT * FROM bqc_data WHERE id = ? AND user_id = ?',
         [id, userId],
-        (err, row) => {
+        (err, row: any) => {
           if (err) {
             reject(err);
           } else {
@@ -254,6 +288,13 @@ class Database {
                 row.manufacturer_types = JSON.parse(row.manufacturer_types || '[]');
               } catch {
                 row.manufacturer_types = [];
+              }
+              
+              // Parse commercial evaluation method
+              try {
+                row.commercial_evaluation_method = JSON.parse(row.commercial_evaluation_method || '[]');
+              } catch {
+                row.commercial_evaluation_method = [];
               }
             }
             resolve(row);

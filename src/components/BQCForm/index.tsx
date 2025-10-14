@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Tab } from '@headlessui/react';
 import { useBQC } from '@/hooks/useBQC';
 import { PreambleSection } from './PreambleSection';
@@ -9,7 +9,7 @@ import { ApprovalSection } from './ApprovalSection';
 import { LoadDataModal } from '../LoadDataModal';
 import { ProgressIndicator } from '../ProgressIndicator';
 import { Tooltip } from '../Tooltip';
-import { FormStats } from '../FormStats';
+import { SuccessPopup } from '../SuccessPopup';
 import { 
   DocumentTextIcon, 
   ClipboardDocumentListIcon, 
@@ -47,21 +47,23 @@ export function BQCForm() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [currentTabIndex, setCurrentTabIndex] = useState(0);
   const [completedSections, setCompletedSections] = useState<Set<number>>(new Set());
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [generationTimeMs, setGenerationTimeMs] = useState(0);
 
   const calculatedValues = getCalculatedValues();
 
   const tabs = [
-    { name: 'Preamble', icon: DocumentTextIcon, description: 'Basic tender information' },
-    { name: 'Scope of Work', icon: ClipboardDocumentListIcon, description: 'Work details and contract terms' },
-    { name: 'BQC Criteria', icon: CheckCircleIcon, description: 'Qualification requirements' },
-    { name: 'Other Sections', icon: Cog6ToothIcon, description: 'Additional requirements' },
-    { name: 'Approval', icon: UserGroupIcon, description: 'Final approval details' },
+    { name: 'Preamble', icon: DocumentTextIcon },
+    { name: 'Scope', icon: ClipboardDocumentListIcon },
+    { name: 'BQC', icon: CheckCircleIcon },
+    { name: 'Other', icon: Cog6ToothIcon },
+    { name: 'Approval', icon: UserGroupIcon },
   ];
 
   const progressSteps = tabs.map((tab, index) => ({
     id: `step-${index}`,
     name: tab.name,
-    description: tab.description,
+    description: `Complete ${tab.name.toLowerCase()} section`,
     status: completedSections.has(index) 
       ? 'complete' as const
       : index === currentTabIndex 
@@ -74,27 +76,27 @@ export function BQCForm() {
     const newCompletedSections = new Set<number>();
     
     // Preamble section completion check
-    if (bqcData.tenderType && bqcData.tenderNumber && bqcData.tenderTitle) {
+    if (bqcData.tenderType && bqcData.refNumber && bqcData.itemName) {
       newCompletedSections.add(0);
     }
     
     // Scope section completion check
-    if (bqcData.scopeOfWork && bqcData.contractPeriodYears) {
+    if (bqcData.scopeOfWork && bqcData.contractPeriodMonths) {
       newCompletedSections.add(1);
     }
     
     // BQC section completion check
-    if (bqcData.manufacturerType && bqcData.groupOption) {
+    if (bqcData.manufacturerTypes && bqcData.manufacturerTypes.length > 0) {
       newCompletedSections.add(2);
     }
     
     // Other sections completion check
-    if (bqcData.performanceBankGuarantee !== undefined) {
+    if (bqcData.performanceSecurity !== undefined) {
       newCompletedSections.add(3);
     }
     
     // Approval section completion check
-    if (bqcData.approvalAuthority) {
+    if (bqcData.approvedBy) {
       newCompletedSections.add(4);
     }
     
@@ -140,79 +142,71 @@ export function BQCForm() {
 
     const result = await generateDocument('docx');
     if (result.success) {
-      setSuccessMessage('Document generated and downloaded successfully!');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      // Show success popup with generation time
+      if (result.generationTimeMs !== undefined) {
+        setGenerationTimeMs(result.generationTimeMs);
+        setShowSuccessPopup(true);
+      } else {
+        // Fallback to old success message if time is not available
+        setSuccessMessage('Document generated and downloaded successfully!');
+        setTimeout(() => setSuccessMessage(null), 3000);
+      }
     }
   };
 
   return (
     <div className="min-h-screen">
-      {/* Enhanced Header */}
-      <div className="bg-white/80 backdrop-blur-md shadow-xl border-b border-gray-100 sticky top-0 z-40">
+      {/* Action Buttons Bar */}
+      <div className="bg-white/95 backdrop-blur-xl shadow-lg border-b border-gray-200/50 sticky top-20 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="py-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="h-12 w-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold gradient-text">BQC Document Generator</h1>
-                  <p className="text-sm text-gray-600 font-medium">Bid Qualification Criteria Generator for Procurement</p>
-                </div>
-              </div>
+          <div className="py-4">
+            <div className="flex items-center justify-center space-x-4">
+              <Tooltip content="Load saved data" position="bottom">
+                <button
+                  onClick={handleLoad}
+                  disabled={isLoading}
+                  className="btn-purple flex items-center space-x-3 text-sm hover-lift px-6 py-3"
+                >
+                  <FolderOpenIcon className="h-5 w-5" />
+                  <span>Load</span>
+                </button>
+              </Tooltip>
               
-              {/* Enhanced Action Buttons with Tooltips */}
-              <div className="flex items-center space-x-3">
-                <Tooltip content="Load previously saved BQC data" position="bottom">
-                  <button
-                    onClick={handleLoad}
-                    disabled={isLoading}
-                    className="btn-purple flex items-center space-x-2 text-sm hover-lift"
-                  >
-                    <FolderOpenIcon className="h-4 w-4" />
-                    <span>Load Data</span>
-                  </button>
-                </Tooltip>
-                
-                <Tooltip content="Save current form data for later use" position="bottom">
-                  <button
-                    onClick={handleSave}
-                    disabled={isLoading}
-                    className="btn-warning flex items-center space-x-2 text-sm hover-lift"
-                  >
-                    <DocumentTextIcon className="h-4 w-4" />
-                    <span>{isLoading ? 'Saving...' : 'Save Data'}</span>
-                  </button>
-                </Tooltip>
-                
-                <Tooltip content="Clear all form data and start fresh" position="bottom">
-                  <button
-                    onClick={handleClear}
-                    disabled={isLoading}
-                    className="btn-danger flex items-center space-x-2 text-sm hover-lift"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                    <span>Clear Form</span>
-                  </button>
-                </Tooltip>
-                
-                <Tooltip content="Generate and download the BQC document" position="bottom">
-                  <button
-                    onClick={handleGenerate}
-                    disabled={isLoading}
-                    className="btn-success flex items-center space-x-2 text-sm hover-lift relative"
-                  >
-                    <DocumentArrowDownIcon className="h-4 w-4" />
-                    <span>{isLoading ? 'Generating...' : 'Generate Document'}</span>
-                    {completedSections.size === tabs.length && (
-                      <SparklesIcon className="h-4 w-4 text-yellow-300 absolute -top-1 -right-1 animate-pulse" />
-                    )}
-                  </button>
-                </Tooltip>
-              </div>
+              <Tooltip content="Save current data" position="bottom">
+                <button
+                  onClick={handleSave}
+                  disabled={isLoading}
+                  className="btn-warning flex items-center space-x-3 text-sm hover-lift px-6 py-3"
+                >
+                  <DocumentTextIcon className="h-5 w-5" />
+                  <span>{isLoading ? 'Saving...' : 'Save'}</span>
+                </button>
+              </Tooltip>
+              
+              <Tooltip content="Clear form" position="bottom">
+                <button
+                  onClick={handleClear}
+                  disabled={isLoading}
+                  className="btn-danger flex items-center space-x-3 text-sm hover-lift px-6 py-3"
+                >
+                  <TrashIcon className="h-5 w-5" />
+                  <span>Clear</span>
+                </button>
+              </Tooltip>
+              
+              <Tooltip content="Generate document" position="bottom">
+                <button
+                  onClick={handleGenerate}
+                  disabled={isLoading}
+                  className="btn-success flex items-center space-x-3 text-sm hover-lift px-6 py-3 relative"
+                >
+                  <DocumentArrowDownIcon className="h-5 w-5" />
+                  <span>{isLoading ? 'Generating...' : 'Generate'}</span>
+                  {completedSections.size === tabs.length && (
+                    <SparklesIcon className="h-5 w-5 text-yellow-300 absolute -top-1 -right-1 animate-pulse" />
+                  )}
+                </button>
+              </Tooltip>
             </div>
           </div>
         </div>
@@ -245,36 +239,29 @@ export function BQCForm() {
       )}
 
       {/* Enhanced Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Form Statistics */}
-        <FormStats 
-          completedSections={completedSections.size}
-          totalSections={tabs.length}
-          estimatedValue={bqcData.cecEstimateInclGst}
-          lastSaved={undefined} // TODO: Add last saved timestamp to BQC data
-        />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         
         {/* Progress Indicator */}
         <ProgressIndicator steps={progressSteps} currentStep={currentTabIndex} />
         
         <Tab.Group selectedIndex={currentTabIndex} onChange={setCurrentTabIndex}>
-          <Tab.List className="flex space-x-2 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 p-2 mb-8 shadow-inner border border-blue-100">
+          <Tab.List className="flex space-x-3 rounded-3xl bg-gradient-to-r from-blue-50/80 to-indigo-50/80 p-3 mb-10 shadow-inner border border-blue-200/50 backdrop-blur-sm">
             {tabs.map((tab) => (
               <Tab
                 key={tab.name}
                 className={({ selected }) =>
                   classNames(
-                    'w-full rounded-xl py-3 px-4 text-sm font-semibold leading-5 transition-all duration-300',
-                    'focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-2',
+                    'w-full rounded-2xl py-4 px-6 text-sm font-semibold leading-5 transition-all duration-300',
+                    'focus:outline-none focus:ring-2 focus:ring-blue-300/50 focus:ring-offset-2',
                     selected
-                      ? 'bg-white text-blue-700 shadow-lg border border-blue-200 transform scale-105'
-                      : 'text-blue-600 hover:bg-white/50 hover:text-blue-800 hover:shadow-md'
+                      ? 'bg-white/90 text-blue-700 shadow-xl border border-blue-200/50 transform scale-105 backdrop-blur-sm'
+                      : 'text-blue-600 hover:bg-white/60 hover:text-blue-800 hover:shadow-lg hover:scale-102'
                   )
                 }
               >
-                <div className="flex items-center justify-center space-x-2">
-                  <tab.icon className="h-5 w-5" />
-                  <span className="hidden sm:inline">{tab.name}</span>
+                <div className="flex items-center justify-center space-x-3">
+                  <tab.icon className="h-6 w-6" />
+                  <span className="hidden sm:inline font-medium">{tab.name}</span>
                 </div>
               </Tab>
             ))}
@@ -331,6 +318,13 @@ export function BQCForm() {
           onLoad={handleLoadData}
         />
       )}
+
+      {/* Success Popup */}
+      <SuccessPopup
+        isVisible={showSuccessPopup}
+        generationTimeMs={generationTimeMs}
+        onClose={() => setShowSuccessPopup(false)}
+      />
     </div>
   );
 }

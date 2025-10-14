@@ -1,16 +1,7 @@
-import React from 'react';
 import type { BQCData } from '@/types';
 import { GROUP_OPTIONS, TENDER_TYPES, PLATFORM_OPTIONS, EVALUATION_METHODOLOGY_OPTIONS } from '@/utils/constants';
 import { Tooltip } from '../Tooltip';
 import { LotWiseTable } from '../LotWiseTable';
-import { 
-  DocumentTextIcon, 
-  CalendarDaysIcon, 
-  CurrencyRupeeIcon,
-  BuildingOfficeIcon,
-  ClipboardDocumentListIcon,
-  ChartBarIcon
-} from '@heroicons/react/24/outline';
 
 interface PreambleSectionProps {
   data: BQCData;
@@ -19,42 +10,57 @@ interface PreambleSectionProps {
 
 export function PreambleSection({ data, onChange }: PreambleSectionProps) {
   return (
-    <div className="card hover-lift">
-      <div className="card-header">
-        <div className="flex items-center space-x-3">
-          <div className="h-8 w-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-            <DocumentTextIcon className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Preamble</h3>
-            <p className="text-sm text-gray-600">Basic tender information and requirements</p>
-          </div>
-        </div>
+    <div className="space-y-8">
+      {/* Section Header */}
+      <div className="text-center mb-8">
+        <h2 className="text-3xl font-bold text-gray-900 mb-3">1. PREAMBLE</h2>
+        <p className="text-gray-600 font-medium">Basic tender information and procurement details</p>
       </div>
-      <div className="card-body space-y-6">
+      
+      <div className="card">
+        <div className="card-header">
+          <h3 className="text-xl font-semibold text-gray-900">Tender Information</h3>
+          <p className="text-gray-600 mt-1">Enter the basic details for your BQC document</p>
+        </div>
+        <div className="card-body space-y-8">
         {/* Reference Number */}
-        <div>
-          <label htmlFor="refNumber" className="form-label">
+        <div className="form-group">
+          <label htmlFor="refNumber" className="form-label text-lg">
             Reference Number *
           </label>
           <input
             type="text"
             id="refNumber"
-            className="form-input"
-            placeholder="XXXXXX"
+            className="form-input h-12 text-base"
+            placeholder="Enter reference number (e.g., TENDER/2024/001)"
             value={data.refNumber}
             onChange={(e) => onChange({ refNumber: e.target.value })}
           />
         </div>
 
+        {/* Subject */}
+        <div className="form-group">
+          <label htmlFor="subject" className="form-label text-lg">
+            Subject *
+          </label>
+          <textarea
+            id="subject"
+            rows={4}
+            className="form-input text-base"
+            placeholder="Enter detailed subject description"
+            value={data.subject || ''}
+            onChange={(e) => onChange({ subject: e.target.value })}
+          />
+        </div>
+
         {/* Procurement Group */}
-        <div>
-          <label htmlFor="groupName" className="form-label">
+        <div className="form-group">
+          <label htmlFor="groupName" className="form-label text-lg">
             Procurement Group *
           </label>
           <select
             id="groupName"
-            className="form-input"
+            className="form-input h-12 text-base"
             value={data.groupName.split(' - ')[0]}
             onChange={(e) => {
               const selectedGroup = GROUP_OPTIONS.find(g => g.key === e.target.value);
@@ -72,43 +78,43 @@ export function PreambleSection({ data, onChange }: PreambleSectionProps) {
         </div>
 
         {/* Tender Description */}
-        <div>
-          <label htmlFor="tenderDescription" className="form-label">
+        <div className="form-group">
+          <label htmlFor="tenderDescription" className="form-label text-lg">
             Tender Description *
           </label>
           <textarea
             id="tenderDescription"
             rows={3}
-            className="form-input"
-            placeholder="Provide a detailed description of the tender"
+            className="form-input text-base"
+            placeholder="Provide a comprehensive description of the tender"
             value={data.tenderDescription}
             onChange={(e) => onChange({ tenderDescription: e.target.value })}
           />
         </div>
 
         {/* PR Reference */}
-        <div>
-          <label htmlFor="prReference" className="form-label">
+        <div className="form-group">
+          <label htmlFor="prReference" className="form-label text-lg">
             PR Reference *
           </label>
           <input
             type="text"
             id="prReference"
-            className="form-input"
-            placeholder="Enter PR or email reference"
+            className="form-input h-12 text-base"
+            placeholder="Enter PR reference number"
             value={data.prReference}
             onChange={(e) => onChange({ prReference: e.target.value })}
           />
         </div>
 
         {/* Tender Type */}
-        <div>
-          <label htmlFor="tenderType" className="form-label">
+        <div className="form-group">
+          <label htmlFor="tenderType" className="form-label text-lg">
             Type of Tender *
           </label>
           <select
             id="tenderType"
-            className="form-input"
+            className="form-input h-12 text-base"
             value={data.tenderType}
             onChange={(e) => onChange({ tenderType: e.target.value as BQCData['tenderType'] })}
           >
@@ -123,9 +129,8 @@ export function PreambleSection({ data, onChange }: PreambleSectionProps) {
         {/* Evaluation Methodology */}
         <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-6">
           <div className="flex items-center space-x-2 mb-4">
-            <ChartBarIcon className="h-5 w-5 text-purple-600" />
-            <h4 className="text-md font-semibold text-purple-900">Evaluation Methodology</h4>
-            <Tooltip content="Choose between Least Cost Selection (LCS) or Lot-wise evaluation" position="right" />
+            <h4 className="text-md font-semibold text-purple-900">Evaluation Method</h4>
+            <Tooltip content="Choose evaluation method" position="right" />
           </div>
           
           <div className="form-group">
@@ -135,8 +140,11 @@ export function PreambleSection({ data, onChange }: PreambleSectionProps) {
             <select
               id="evaluationMethodology"
               className="form-input border-purple-200 focus:border-purple-500 focus:ring-purple-200"
-              value={data.evaluationMethodology}
-              onChange={(e) => onChange({ evaluationMethodology: e.target.value as BQCData['evaluationMethodology'] })}
+              value={data.evaluationMethodology || 'LCS'}
+              onChange={(e) => {
+                const selectedMethod = e.target.value as BQCData['evaluationMethodology'];
+                onChange({ evaluationMethodology: selectedMethod });
+              }}
             >
               {EVALUATION_METHODOLOGY_OPTIONS.map((method) => (
                 <option key={method} value={method}>
@@ -145,7 +153,7 @@ export function PreambleSection({ data, onChange }: PreambleSectionProps) {
               ))}
             </select>
             <p className="mt-1 text-sm text-purple-600">
-              {data.evaluationMethodology === 'LCS' 
+              {(data.evaluationMethodology || 'LCS') === 'LCS' 
                 ? 'Single CEC estimate for entire tender'
                 : 'Separate CEC estimates for individual lots'
               }
@@ -158,7 +166,6 @@ export function PreambleSection({ data, onChange }: PreambleSectionProps) {
           /* LCS - Single CEC Estimates */
           <div className="bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 rounded-xl p-6">
             <div className="flex items-center space-x-2 mb-4">
-              <CurrencyRupeeIcon className="h-5 w-5 text-emerald-600" />
               <h4 className="text-md font-semibold text-emerald-900">CEC Estimates (LCS)</h4>
               <Tooltip content="Contract Estimate Committee approved estimates for entire tender" position="right" />
             </div>
@@ -180,7 +187,7 @@ export function PreambleSection({ data, onChange }: PreambleSectionProps) {
                     onChange={(e) => onChange({ cecEstimateInclGst: parseFloat(e.target.value) || 0 })}
                   />
                   <span className="absolute inset-y-0 right-0 pr-4 flex items-center text-sm font-medium text-emerald-600">
-                    ₹ Lakh
+                    ₹ Crore
                   </span>
                 </div>
               </div>
@@ -201,7 +208,7 @@ export function PreambleSection({ data, onChange }: PreambleSectionProps) {
                     onChange={(e) => onChange({ cecEstimateExclGst: parseFloat(e.target.value) || 0 })}
                   />
                   <span className="absolute inset-y-0 right-0 pr-4 flex items-center text-sm font-medium text-emerald-600">
-                    ₹ Lakh
+                    ₹ Crore
                   </span>
                 </div>
               </div>
@@ -213,7 +220,7 @@ export function PreambleSection({ data, onChange }: PreambleSectionProps) {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-emerald-700 font-medium">GST Amount:</span>
                   <span className="text-emerald-900 font-semibold">
-                    ₹ {(data.cecEstimateInclGst - data.cecEstimateExclGst).toFixed(2)} Lakh
+                    ₹ {(data.cecEstimateInclGst - data.cecEstimateExclGst).toFixed(2)} Crore
                   </span>
                 </div>
               </div>
@@ -230,7 +237,6 @@ export function PreambleSection({ data, onChange }: PreambleSectionProps) {
         {/* Enhanced CEC Date */}
         <div className="form-group">
           <label htmlFor="cecDate" className="form-label flex items-center space-x-2">
-            <CalendarDaysIcon className="h-4 w-4 text-blue-600" />
             <span>CEC Date *</span>
             <Tooltip content="Date when Contract Estimate Committee approved the estimates" position="right" />
           </label>
@@ -276,6 +282,8 @@ export function PreambleSection({ data, onChange }: PreambleSectionProps) {
             ))}
           </select>
         </div>
+
+      </div>
       </div>
     </div>
   );

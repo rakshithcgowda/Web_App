@@ -1,6 +1,6 @@
 // import React from 'react';
 import type { BQCData } from '@/types';
-import { formatCurrency } from '@/utils/calculations';
+import { formatPastPerformance } from '@/utils/calculations';
 
 interface ScopeSectionProps {
   data: BQCData;
@@ -12,51 +12,72 @@ interface ScopeSectionProps {
 
 export function ScopeSection({ data, onChange, calculatedValues }: ScopeSectionProps) {
   return (
-    <div className="card">
-      <div className="card-header">
-        <h3 className="text-lg font-medium text-gray-900">Scope of Work</h3>
+    <div className="space-y-8">
+      {/* Enhanced Section Heading */}
+      <div className="text-center mb-8">
+        <h2 className="text-3xl font-bold text-gray-900 mb-3">2. BRIEF SCOPE OF WORK/ SUPPLY ITEMS</h2>
+        <p className="text-gray-600 font-medium">Define the scope, quantities, and contract terms</p>
       </div>
-      <div className="card-body space-y-6">
+      
+      <div className="card">
+        <div className="card-header">
+          <h3 className="text-xl font-semibold text-gray-900">Scope of Work</h3>
+          <p className="text-gray-600 mt-1">Provide detailed information about the work scope and contract terms</p>
+        </div>
+        <div className="card-body space-y-8">
         {/* Scope of Work */}
-        <div>
-          <label htmlFor="scopeOfWork" className="form-label">
+        <div className="form-group">
+          <label htmlFor="scopeOfWork" className="form-label text-lg">
             Brief Scope of Work *
           </label>
           <textarea
             id="scopeOfWork"
-            rows={3}
-            className="form-input"
-            placeholder="Provide a brief scope of work or supply items"
+            rows={4}
+            className="form-input text-base"
+            placeholder="Provide a detailed scope of work or supply items"
             value={data.scopeOfWork}
             onChange={(e) => onChange({ scopeOfWork: e.target.value })}
           />
         </div>
 
-        {/* Contract Period - Only show for LCS */}
+        {/* Quantity Supplied - Only show for LCS */}
         {data.evaluationMethodology === 'LCS' && (
           <div>
-            <label htmlFor="contractPeriodYears" className="form-label">
-              Contract Period (Years) *
+            <label htmlFor="quantitySupplied" className="form-label">
+              Quantity Supplied *
             </label>
             <div className="relative">
               <input
                 type="number"
-                id="contractPeriodYears"
+                id="quantitySupplied"
                 className="form-input pr-16"
-                placeholder="1"
+                placeholder="0"
                 step="1"
-                min="1"
-                max="20"
-                value={data.contractPeriodYears || ''}
-                onChange={(e) => onChange({ contractPeriodYears: parseInt(e.target.value) || 1 })}
+                min="0"
+                value={data.quantitySupplied || ''}
+                onChange={(e) => onChange({ quantitySupplied: parseInt(e.target.value) || 0 })}
               />
               <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm text-gray-500">
-                years
+                Crore
               </span>
             </div>
-            <p className="mt-1 text-sm text-gray-500">
-              Contract period must be at least 1 year
-            </p>
+          </div>
+        )}
+
+        {/* Contract Period - Only show for LCS */}
+        {data.evaluationMethodology === 'LCS' && (
+          <div>
+            <label htmlFor="contractPeriodMonths" className="form-label">
+              Contract Period *
+            </label>
+            <input
+              type="text"
+              id="contractPeriodMonths"
+              className="form-input"
+              placeholder="e.g., 5 years, 24 months, 2 years"
+              value={data.contractPeriodMonths || ''}
+              onChange={(e) => onChange({ contractPeriodMonths: e.target.value })}
+            />
           </div>
         )}
 
@@ -67,9 +88,9 @@ export function ScopeSection({ data, onChange, calculatedValues }: ScopeSectionP
               <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <p className="text-sm font-medium text-blue-800">
-                Contract periods are managed individually for each lot in the Preamble section.
-              </p>
+               <p className="text-sm font-medium text-blue-800">
+                 Contract periods managed per lot in Preamble section.
+               </p>
             </div>
           </div>
         )}
@@ -85,10 +106,7 @@ export function ScopeSection({ data, onChange, calculatedValues }: ScopeSectionP
                   </svg>
                 </div>
                 <p className="calculation-value">
-                  {formatCurrency(calculatedValues.pastPerformance)}
-                </p>
-                <p className="text-xs text-blue-600 mt-1 font-medium">
-                  {data.mseRelaxation ? '25.5% of CEC (with MSE relaxation)' : '30% of CEC incl. GST'}
+                  {formatPastPerformance(calculatedValues.pastPerformance)}
                 </p>
               </div>
         ) : (
@@ -102,15 +120,9 @@ export function ScopeSection({ data, onChange, calculatedValues }: ScopeSectionP
             </div>
             
             <div className="space-y-3">
-              <p className="text-sm text-purple-800 font-medium">
-                📊 Individual calculations are shown in the lot table above:
-              </p>
-              <ul className="text-sm text-purple-700 space-y-1 ml-4">
-                <li>• <strong>Past Performance:</strong> 30% of CEC incl. GST (25.5% with MSE relaxation)</li>
-                <li>• <strong>EMD Amount:</strong> Calculated per lot based on individual CEC values</li>
-                <li>• <strong>Turnover Requirement:</strong> 30% of each lot's CEC (excluding AMC if applicable)</li>
-                <li>• <strong>MSE Relaxation:</strong> Individual 15% reduction per lot when applicable</li>
-              </ul>
+               <p className="text-sm text-purple-800 font-medium">
+                 Individual calculations shown in lot table above
+               </p>
               
               {data.lots && data.lots.length > 0 && (
                 <div className="mt-4 p-3 bg-white/60 rounded-lg border border-purple-100">
@@ -134,30 +146,24 @@ export function ScopeSection({ data, onChange, calculatedValues }: ScopeSectionP
 
         {/* AMC Section - Only show for LCS */}
         {data.evaluationMethodology === 'LCS' && (
-          <div className="card hover-lift">
+          <div className="card">
           <div className="card-header">
             <div className="flex items-center space-x-3">
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="hasAmc"
-                  className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded transition-all duration-200"
-                  checked={data.hasAmc}
-                  onChange={(e) => onChange({ hasAmc: e.target.checked })}
-                />
-                <label htmlFor="hasAmc" className="ml-3 block text-sm font-semibold text-gray-700">
-                  Has AMC/CAMC?
-                </label>
-              </div>
-              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
+              <input
+                type="checkbox"
+                id="hasAmc"
+                className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded transition-all duration-200"
+                checked={data.hasAmc}
+                onChange={(e) => onChange({ hasAmc: e.target.checked })}
+              />
+              <label htmlFor="hasAmc" className="text-lg font-medium text-gray-900">
+                Has AMC/CAMC?
+              </label>
             </div>
           </div>
 
           {data.hasAmc && (
-            <div className="space-y-5">
+            <div className="card-body space-y-4">
               <div className="form-group">
                 <label htmlFor="amcPeriod" className="form-label">
                   AMC Period
@@ -188,7 +194,7 @@ export function ScopeSection({ data, onChange, calculatedValues }: ScopeSectionP
                     onChange={(e) => onChange({ amcValue: parseFloat(e.target.value) || 0 })}
                   />
                   <span className="absolute inset-y-0 right-0 pr-4 flex items-center text-sm font-medium text-gray-500">
-                    Lakh
+                    Crore
                   </span>
                 </div>
               </div>
@@ -204,9 +210,9 @@ export function ScopeSection({ data, onChange, calculatedValues }: ScopeSectionP
               <svg className="h-5 w-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <p className="text-sm font-medium text-amber-800">
-                AMC/CAMC is managed individually for each lot in the Preamble section.
-              </p>
+               <p className="text-sm font-medium text-amber-800">
+                 AMC/CAMC managed per lot in Preamble section.
+               </p>
             </div>
           </div>
         )}
@@ -224,15 +230,27 @@ export function ScopeSection({ data, onChange, calculatedValues }: ScopeSectionP
             value={data.paymentTerms}
             onChange={(e) => onChange({ paymentTerms: e.target.value })}
           />
-          <p className="mt-1 text-sm text-gray-500">
-            Only if different from standard terms (within 30 days)
-          </p>
+        </div>
+
+        {/* Bid Validity Period - Required for all tender types */}
+        <div>
+          <label htmlFor="bidValidityPeriod" className="form-label">
+            Bid Validity Period *
+          </label>
+          <input
+            type="text"
+            id="bidValidityPeriod"
+            className="form-input"
+            placeholder="e.g., 90 days"
+            value={data.bidValidityPeriod || ''}
+            onChange={(e) => onChange({ bidValidityPeriod: e.target.value })}
+          />
         </div>
 
         {/* Goods-specific fields */}
         {data.tenderType === 'Goods' && (
           <div className="border border-gray-200 rounded-lg p-4">
-            <h4 className="text-md font-medium text-gray-900 mb-4">Goods-Specific Fields</h4>
+            <h4 className="text-md font-medium text-gray-900 mb-4">Goods Fields</h4>
             
             <div className="space-y-4">
               <div>
@@ -265,6 +283,7 @@ export function ScopeSection({ data, onChange, calculatedValues }: ScopeSectionP
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

@@ -17,11 +17,12 @@ export function LotWiseTable({ lots, onLotsChange }: LotWiseTableProps) {
       description: '',
       cecEstimateInclGst: 0,
       cecEstimateExclGst: 0,
-      contractPeriodYears: 1,
+      contractPeriodMonths: 12,
       hasAmc: false,
       amcValue: 0,
       amcPeriod: '',
       mseRelaxation: false,
+      quantitySupplied: 0,
     };
     onLotsChange([...lots, newLot]);
     setEditingLot(newLot.id);
@@ -48,38 +49,48 @@ export function LotWiseTable({ lots, onLotsChange }: LotWiseTableProps) {
   };
 
   const getPastPerformance = (lot: LotData) => {
-    // Past Performance calculation for Goods
-    // Non-MSE: 30% of CEC incl GST
-    // MSE: 15% relaxation (30% - 15% = 25.5% of CEC incl GST)
+    // Past Performance calculation: 30% of Quantity Supplied
+    // MSE: 15% relaxation (30% - 15% = 25.5% of Quantity Supplied)
     const basePercentage = 0.30;
-    const cecValue = lot.cecEstimateInclGst || 0;
+    const quantitySupplied = lot.quantitySupplied || 0;
     
     if (lot.mseRelaxation) {
       // Apply 15% relaxation: 30% * (1 - 0.15) = 25.5%
-      return cecValue * basePercentage * (1 - 0.15);
+      return Math.round(quantitySupplied * basePercentage * (1 - 0.15));
     } else {
-      // Standard 30% of CEC incl GST
-      return cecValue * basePercentage;
+      // Standard 30% of Quantity Supplied
+      return Math.round(quantitySupplied * basePercentage);
     }
   };
 
   const getEMDAmount = (lot: LotData) => {
-    // EMD calculation for individual lot - based on CEC including GST
+    // EMD calculation based on the provided table - returns values in Lakhs
     const cecValue = lot.cecEstimateInclGst || 0;
-    if (cecValue < 50) return 0;
-    if (cecValue <= 100) return 0; // For Goods/Services
-    if (cecValue <= 500) return 2.5;
-    if (cecValue <= 1000) return 5;
-    if (cecValue <= 1500) return 7.5;
-    if (cecValue <= 2500) return 10;
-    return 20;
+    
+    // Note: This assumes tenderType is available in lot data or uses a default
+    // For now, we'll use Service logic as it's the most comprehensive
+    if (cecValue >= 0.5 && cecValue <= 1.0) {
+      return 1; // Services/Works: 1 Lakh
+    } else if (cecValue > 1.0 && cecValue <= 5.0) {
+      return 2.5; // 2.5 Lakhs
+    } else if (cecValue > 5.0 && cecValue <= 10.0) {
+      return 5; // 5 Lakhs
+    } else if (cecValue > 10.0 && cecValue <= 15.0) {
+      return 7.5; // 7.5 Lakhs
+    } else if (cecValue > 15.0 && cecValue <= 25.0) {
+      return 10; // 10 Lakhs
+    } else if (cecValue > 25.0) {
+      return 20; // 20 Lakhs
+    }
+    return 0; // For values < 0.5 Cr
   };
 
   const getTurnoverRequirement = (lot: LotData) => {
-    // 30% of CEC excluding AMC
-    const baseValue = lot.hasAmc ? (lot.cecEstimateInclGst - lot.amcValue) : lot.cecEstimateExclGst;
-    return baseValue * 0.3;
+    // 30% of (CEC including GST - AMC)
+    const baseAmount = lot.cecEstimateInclGst - (lot.hasAmc ? lot.amcValue : 0);
+    return baseAmount * 0.3;
   };
+
 
   const getTotalPastPerformance = () => {
     return lots.reduce((total, lot) => total + getPastPerformance(lot), 0);
@@ -123,15 +134,16 @@ export function LotWiseTable({ lots, onLotsChange }: LotWiseTableProps) {
         <div className="space-y-4">
           {/* Table Header */}
           <div className="bg-white/80 rounded-lg border border-blue-200 overflow-hidden">
-            <div className="grid grid-cols-13 gap-2 p-4 bg-gradient-to-r from-blue-100 to-indigo-100 font-semibold text-blue-900 text-xs">
+            <div className="grid grid-cols-14 gap-2 p-4 bg-gradient-to-r from-blue-100 to-indigo-100 font-semibold text-blue-900 text-xs">
               <div className="col-span-1">Lot</div>
               <div className="col-span-2">Description</div>
               <div className="col-span-1">CEC (Incl.)</div>
               <div className="col-span-1">CEC (Excl.)</div>
-              <div className="col-span-1">Years</div>
+              <div className="col-span-1">Months</div>
               <div className="col-span-1">AMC</div>
               <div className="col-span-1">MSE</div>
               <div className="col-span-1">Past Perf.</div>
+              <div className="col-span-1">Qty. Supplied</div>
               <div className="col-span-1">EMD</div>
               <div className="col-span-1">Turnover</div>
               <div className="col-span-2">Actions</div>
@@ -139,7 +151,7 @@ export function LotWiseTable({ lots, onLotsChange }: LotWiseTableProps) {
 
             {/* Table Rows */}
             {lots.map((lot) => (
-              <div key={lot.id} className="grid grid-cols-13 gap-2 p-3 border-t border-blue-100 hover:bg-blue-50/50 transition-colors duration-200">
+              <div key={lot.id} className="grid grid-cols-14 gap-2 p-3 border-t border-blue-100 hover:bg-blue-50/50 transition-colors duration-200">
                 {/* Lot Number */}
                 <div className="col-span-1">
                   {editingLot === lot.id ? (
@@ -207,33 +219,33 @@ export function LotWiseTable({ lots, onLotsChange }: LotWiseTableProps) {
                   />
                 </div>
 
-                {/* Contract Years */}
+                {/* Contract Months */}
                 <div className="col-span-1">
                   <input
                     type="number"
-                    value={lot.contractPeriodYears || ''}
+                    value={lot.contractPeriodMonths || ''}
                     onChange={(e) => {
                       const value = parseInt(e.target.value) || 0;
-                      updateLot(lot.id, { contractPeriodYears: value });
+                      updateLot(lot.id, { contractPeriodMonths: value });
                     }}
-                    placeholder="1"
+                    placeholder="12"
                     step="1"
-                    min="0"
-                    max="20"
+                    min="1"
+                    max="240"
                     className={`form-input text-xs h-7 w-full ${
-                      (lot.contractPeriodYears || 0) < 1 
+                      (lot.contractPeriodMonths || 0) < 1 
                         ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-red-200' 
                         : 'border-blue-200 focus:border-blue-500'
                     }`}
                     title={
-                      (lot.contractPeriodYears || 0) < 1 
-                        ? 'Contract period must be at least 1 year' 
-                        : `Contract period for ${lot.lotNumber}`
+                      (lot.contractPeriodMonths || 0) < 1 
+                        ? 'Contract period must be at least 1 month' 
+                        : `Contract period for ${lot.lotNumber} (annualization only applies for periods &gt; 12 months)`
                     }
                   />
-                  {(lot.contractPeriodYears || 0) < 1 && (
+                  {(lot.contractPeriodMonths || 0) < 1 && (
                     <div className="absolute z-10 mt-1 text-xs text-red-600 font-medium">
-                      Min: 1 year
+                      Min: 1 month
                     </div>
                   )}
                 </div>
@@ -285,13 +297,28 @@ export function LotWiseTable({ lots, onLotsChange }: LotWiseTableProps) {
                 {/* Past Performance */}
                 <div className="col-span-1">
                   <div className="text-xs font-semibold text-blue-900 bg-blue-100 rounded px-1 py-1 text-center">
-                    ₹{getPastPerformance(lot).toFixed(1)}L
+                    {getPastPerformance(lot).toLocaleString()} Units
                   </div>
                   {lot.mseRelaxation && (
                     <div className="text-xs text-green-600 font-medium text-center mt-0.5">
                       MSE -15%
                     </div>
                   )}
+                </div>
+
+                {/* Quantity Supplied */}
+                <div className="col-span-1">
+                  <input
+                    type="number"
+                    value={lot.quantitySupplied || ''}
+                    onChange={(e) => updateLot(lot.id, { quantitySupplied: parseInt(e.target.value) || 0 })}
+                    placeholder="0"
+                    step="1"
+                    min="0"
+                    className="form-input text-xs h-7 w-full border-blue-200 focus:border-blue-500"
+                    aria-label={`Quantity supplied for ${lot.lotNumber}`}
+                    title={`Quantity supplied for ${lot.lotNumber}`}
+                  />
                 </div>
 
                 {/* EMD */}
@@ -304,7 +331,7 @@ export function LotWiseTable({ lots, onLotsChange }: LotWiseTableProps) {
                 {/* Turnover Requirement */}
                 <div className="col-span-1">
                   <div className="text-xs font-semibold text-purple-900 bg-purple-100 rounded px-1 py-1 text-center">
-                    ₹{getTurnoverRequirement(lot).toFixed(1)}L
+                    ₹{getTurnoverRequirement(lot).toFixed(1)}Cr
                   </div>
                 </div>
 
@@ -329,14 +356,15 @@ export function LotWiseTable({ lots, onLotsChange }: LotWiseTableProps) {
             ))}
 
             {/* Summary Row */}
-            <div className="grid grid-cols-13 gap-2 p-3 bg-gradient-to-r from-blue-100 to-indigo-100 border-t-2 border-blue-300 font-bold text-blue-900 text-xs">
-              <div className="col-span-3">TOTALS</div>
-              <div className="col-span-1">₹{getTotalCECInclGst().toFixed(1)}L</div>
-              <div className="col-span-1">₹{getTotalCECExclGst().toFixed(1)}L</div>
+            <div className="grid grid-cols-14 gap-2 p-3 bg-gradient-to-r from-blue-100 to-indigo-100 border-t-2 border-blue-300 font-bold text-blue-900 text-xs">
+              <div className="col-span-3">TOTACrS</div>
+              <div className="col-span-1">₹{getTotalCECInclGst().toFixed(1)}Cr</div>
+              <div className="col-span-1">₹{getTotalCECExclGst().toFixed(1)}Cr</div>
               <div className="col-span-1">-</div>
               <div className="col-span-1">-</div>
               <div className="col-span-1">-</div>
-              <div className="col-span-1">₹{getTotalPastPerformance().toFixed(1)}L</div>
+              <div className="col-span-1">₹{getTotalPastPerformance().toFixed(1)}Cr</div>
+              <div className="col-span-1">₹{lots.reduce((total, lot) => total + (lot.quantitySupplied || 0), 0).toFixed(1)}Cr</div>
               <div className="col-span-1">-</div>
               <div className="col-span-1">-</div>
               <div className="col-span-2">-</div>
@@ -349,7 +377,7 @@ export function LotWiseTable({ lots, onLotsChange }: LotWiseTableProps) {
               <div>
                 <p className="text-sm text-blue-600 font-medium">Total GST Amount</p>
                 <p className="text-lg font-bold text-blue-900">
-                  ₹{(getTotalCECInclGst() - getTotalCECExclGst()).toFixed(2)}L
+                  ₹{(getTotalCECInclGst() - getTotalCECExclGst()).toFixed(2)}Cr
                 </p>
               </div>
               <div>
@@ -359,7 +387,7 @@ export function LotWiseTable({ lots, onLotsChange }: LotWiseTableProps) {
               <div>
                 <p className="text-sm text-blue-600 font-medium">Avg. Contract Period</p>
                 <p className="text-lg font-bold text-blue-900">
-                  {lots.length > 0 ? (lots.reduce((sum, lot) => sum + (lot.contractPeriodYears || 0), 0) / lots.length).toFixed(1) : 0} years
+                  {lots.length > 0 ? (lots.reduce((sum, lot) => sum + (lot.contractPeriodMonths || 0), 0) / lots.length).toFixed(1) : 0} months
                 </p>
               </div>
             </div>

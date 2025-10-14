@@ -1,47 +1,97 @@
 import type { BQCData } from '@/types';
-import { EMD_THRESHOLDS } from './constants';
 
 /**
  * Calculate EMD amount based on estimated value and tender type
- * Note: Uses CEC including GST as per updated requirements
+ * Based on the provided EMD table - returns values in Lakhs
  */
 export function calculateEMD(estimatedValue: number, tenderType: string): number {
-  if (estimatedValue < 50) {
+  if (tenderType === 'Goods') {
+    // Goods: 0.5-1.0 Cr = Nil, >1.0 Cr = progressive rates
+    if (estimatedValue >= 0.5 && estimatedValue <= 1.0) {
+      return 0; // Nil
+    } else if (estimatedValue > 1.0 && estimatedValue <= 5.0) {
+      return 2.5; // 2.5 Lakhs
+    } else if (estimatedValue > 5.0 && estimatedValue <= 10.0) {
+      return 5; // 5 Lakhs
+    } else if (estimatedValue > 10.0 && estimatedValue <= 15.0) {
+      return 7.5; // 7.5 Lakhs
+    } else if (estimatedValue > 15.0 && estimatedValue <= 25.0) {
+      return 10; // 10 Lakhs
+    } else if (estimatedValue > 25.0) {
+      return 20; // 20 Lakhs
+    }
     return 0;
   }
-
-  for (const { threshold, emd } of EMD_THRESHOLDS) {
-    if (estimatedValue <= threshold) {
-      // Special case for Goods/Services between 50-100
-      if (threshold === 100 && ['Goods', 'Services'].includes(tenderType)) {
-        return 0;
-      }
-      return emd;
+  
+  if (tenderType === 'Service') {
+    // Services: 0.5-1.0 Cr = 1L, >1.0 Cr = progressive rates
+    if (estimatedValue >= 0.5 && estimatedValue <= 1.0) {
+      return 1; // 1 Lakh
+    } else if (estimatedValue > 1.0 && estimatedValue <= 5.0) {
+      return 2.5; // 2.5 Lakhs
+    } else if (estimatedValue > 5.0 && estimatedValue <= 10.0) {
+      return 5; // 5 Lakhs
+    } else if (estimatedValue > 10.0 && estimatedValue <= 15.0) {
+      return 7.5; // 7.5 Lakhs
+    } else if (estimatedValue > 15.0 && estimatedValue <= 25.0) {
+      return 10; // 10 Lakhs
+    } else if (estimatedValue > 25.0) {
+      return 20; // 20 Lakhs
     }
+    return 0; // For values < 0.5 Cr
   }
-  return 20;
+  
+  if (tenderType === 'Works') {
+    // Works: 0.5-1.0 Cr = 1L, >1.0 Cr = progressive rates
+    if (estimatedValue >= 0.5 && estimatedValue <= 1.0) {
+      return 1; // 1 Lakh
+    } else if (estimatedValue > 1.0 && estimatedValue <= 5.0) {
+      return 2.5; // 2.5 Lakhs
+    } else if (estimatedValue > 5.0 && estimatedValue <= 10.0) {
+      return 5; // 5 Lakhs
+    } else if (estimatedValue > 10.0 && estimatedValue <= 15.0) {
+      return 7.5; // 7.5 Lakhs
+    } else if (estimatedValue > 15.0 && estimatedValue <= 25.0) {
+      return 10; // 10 Lakhs
+    } else if (estimatedValue > 25.0) {
+      return 20; // 20 Lakhs
+    }
+    return 0; // For values < 0.5 Cr
+  }
+  
+  return 0; // Default case
 }
 
 /**
- * Calculate annualized value based on contract period
+ * Calculate annualized value based on contract period (in months)
+ * Only annualize if contract period is more than 12 months
  */
-export function calculateAnnualizedValue(cecEstimate: number, contractPeriodYears: number): number {
-  if (contractPeriodYears <= 0) return 0;
-  return cecEstimate / contractPeriodYears;
+export function calculateAnnualizedValue(cecEstimate: number, contractPeriodMonths: number): number {
+  if (contractPeriodMonths <= 0) return 0;
+  
+  // Only annualize if contract period is more than 12 months
+  if (contractPeriodMonths > 12) {
+    const contractPeriodYears = contractPeriodMonths / 12;
+    return cecEstimate / contractPeriodYears;
+  }
+  
+  // For 12 months or less, return the full amount (no annualization)
+  return cecEstimate;
 }
 
 /**
  * Calculate Past Performance requirement for individual lot or total
+ * Updated to use 30% of Quantity Supplied
  */
-export function calculatePastPerformance(cecInclGst: number, mseRelaxation: boolean = false): number {
-  const basePercentage = 0.30; // 30% of CEC incl GST
+export function calculatePastPerformance(quantitySupplied: number, mseRelaxation: boolean = false): number {
+  const basePercentage = 0.30; // 30% of Quantity Supplied
   
   if (mseRelaxation) {
     // Apply 15% relaxation: 30% * (1 - 0.15) = 25.5%
-    return cecInclGst * basePercentage * (1 - 0.15);
+    return Math.round(quantitySupplied * basePercentage * (1 - 0.15));
   } else {
-    // Standard 30% of CEC incl GST
-    return cecInclGst * basePercentage;
+    // Standard 30% of Quantity Supplied
+    return Math.round(quantitySupplied * basePercentage);
   }
 }
 
@@ -54,10 +104,12 @@ export function calculateLotWiseTotals(data: BQCData): {
   totalPastPerformance: number;
 } {
   if (data.evaluationMethodology === 'LCS') {
+    // For LCS, only use quantitySupplied if it's provided, otherwise return 0
+    const quantitySupplied = data.quantitySupplied || 0;
     return {
       totalCECInclGst: data.cecEstimateInclGst,
       totalCECExclGst: data.cecEstimateExclGst,
-      totalPastPerformance: calculatePastPerformance(data.cecEstimateInclGst, data.mseRelaxation)
+      totalPastPerformance: calculatePastPerformance(quantitySupplied, data.mseRelaxation)
     };
   }
 
@@ -65,7 +117,7 @@ export function calculateLotWiseTotals(data: BQCData): {
   const totalCECInclGst = data.lots?.reduce((sum, lot) => sum + (lot.cecEstimateInclGst || 0), 0) || 0;
   const totalCECExclGst = data.lots?.reduce((sum, lot) => sum + (lot.cecEstimateExclGst || 0), 0) || 0;
   const totalPastPerformance = data.lots?.reduce((sum, lot) => 
-    sum + calculatePastPerformance(lot.cecEstimateInclGst || 0, lot.mseRelaxation || false), 0) || 0;
+    sum + calculatePastPerformance(lot.quantitySupplied || 0, lot.mseRelaxation || false), 0) || 0;
 
   return {
     totalCECInclGst,
@@ -76,6 +128,7 @@ export function calculateLotWiseTotals(data: BQCData): {
 
 /**
  * Calculate turnover requirement with refined logic
+ * Updated to use 30% of (CEC including GST - AMC) and annualize based on contract period
  */
 export function calculateTurnoverRequirement(data: BQCData): {
   amount: number;
@@ -92,59 +145,37 @@ export function calculateTurnoverRequirement(data: BQCData): {
   // Get total CEC values (handles both LCS and lot-wise)
   const totals = calculateLotWiseTotals(data);
 
-  // Calculate turnover requirement considering AMC value
-  let maintenanceValue = 0;
-  let maintenanceText = '';
-
-  if (data.hasAmc) {
-    maintenanceValue = data.amcValue;
-    maintenanceText = 'AMC';
+  // Calculate base amount: CEC including GST minus AMC
+  let baseAmount = totals.totalCECInclGst;
+  
+  // Subtract AMC if applicable
+  if (data.evaluationMethodology === 'LCS' && data.hasAmc && data.amcValue) {
+    baseAmount -= data.amcValue;
+  } else if (data.evaluationMethodology === 'Lot-wise' && data.lots) {
+    const totalAMC = data.lots.reduce((sum, lot) => sum + (lot.hasAmc ? lot.amcValue : 0), 0);
+    baseAmount -= totalAMC;
   }
 
-  let amount: number;
-  let description: string;
-
-  if (maintenanceValue > 0) {
-    // Calculate as base_percentage of (CEC_incl_gst - maintenance_value)
-    amount = basePercentage * (totals.totalCECInclGst - maintenanceValue);
-    description = `${basePercentage * 100}% of CEC-${maintenanceText}`;
-  } else {
-    // Calculate as base_percentage of CEC
-    amount = basePercentage * totals.totalCECExclGst;
-    description = `${basePercentage * 100}% of CEC`;
+  // Calculate turnover requirement as 30% of (CEC including GST - AMC)
+  const turnoverAmount = basePercentage * baseAmount;
+  
+  // Apply annualization for all tender types if contract duration > 1 year
+  const contractDurationYears = data.contractDurationYears || 1;
+  let annualizedAmount = turnoverAmount;
+  
+  if (contractDurationYears > 1) {
+    annualizedAmount = turnoverAmount / contractDurationYears;
   }
+  
+  const description = `${basePercentage * 100}% of (CEC including GST${data.hasAmc || (data.lots && data.lots.some(lot => lot.hasAmc)) ? ' - AMC' : ''})`;
 
   return {
-    amount,
+    amount: annualizedAmount,
     percentage: basePercentage * 100,
     description
   };
 }
 
-/**
- * Calculate supplying capacity (30% of base value)
- */
-export function calculateSupplyingCapacity(baseCapacity: number, mseRelaxation: boolean): {
-  calculated: number;
-  final: number;
-  mseAdjusted?: number;
-} {
-  const calculated = Math.floor(baseCapacity * 0.3);
-  
-  if (mseRelaxation) {
-    const mseAdjusted = Math.floor(calculated * 0.85); // 15% relaxation
-    return {
-      calculated,
-      final: mseAdjusted,
-      mseAdjusted
-    };
-  }
-
-  return {
-    calculated,
-    final: calculated
-  };
-}
 
 /**
  * Calculate experience requirements for Service/Works
@@ -169,18 +200,48 @@ export function calculateExperienceRequirements(data: BQCData): {
   // Get total CEC values (handles both LCS and lot-wise)
   const totals = calculateLotWiseTotals(data);
 
+  // Calculate base values
+  const baseOptionA = optionAPercent * totals.totalCECInclGst;
+  const baseOptionB = optionBPercent * totals.totalCECInclGst;
+  const baseOptionC = optionCPercent * totals.totalCECInclGst;
+
+  // Apply annualization for Service and Works tender types if contract duration > 1 year
+  let annualizedOptionA = baseOptionA;
+  let annualizedOptionB = baseOptionB;
+  let annualizedOptionC = baseOptionC;
+
+  const contractDurationYears = data.contractDurationYears || 1;
+  
+  if ((data.tenderType === 'Service' || data.tenderType === 'Works') && contractDurationYears > 1) {
+    annualizedOptionA = baseOptionA / contractDurationYears;
+    annualizedOptionB = baseOptionB / contractDurationYears;
+    annualizedOptionC = baseOptionC / contractDurationYears;
+  }
+
+  // Apply MSE relaxation for Service/Works tenders with LCS if enabled
+  let finalOptionA = annualizedOptionA;
+  let finalOptionB = annualizedOptionB;
+  let finalOptionC = annualizedOptionC;
+
+  if ((data.tenderType === 'Service' || data.tenderType === 'Works') && data.evaluationMethodology === 'LCS' && data.mseRelaxation) {
+    // Apply 15% relaxation for MSE
+    finalOptionA = annualizedOptionA * 0.85;
+    finalOptionB = annualizedOptionB * 0.85;
+    finalOptionC = annualizedOptionC * 0.85;
+  }
+
   return {
     optionA: {
       percentage: optionAPercent * 100,
-      value: optionAPercent * totals.totalCECInclGst
+      value: finalOptionA
     },
     optionB: {
       percentage: optionBPercent * 100,
-      value: optionBPercent * totals.totalCECInclGst
+      value: finalOptionB
     },
     optionC: {
       percentage: optionCPercent * 100,
-      value: optionCPercent * totals.totalCECInclGst
+      value: finalOptionC
     }
   };
 }
@@ -189,15 +250,44 @@ export function calculateExperienceRequirements(data: BQCData): {
  * Get standard performance security percentage based on tender type
  */
 export function getStandardPerformanceSecurity(tenderType: string): number {
-  return ['Goods', 'Services'].includes(tenderType) ? 5 : 10;
+  return ['Goods', 'Service'].includes(tenderType) ? 5 : 10;
 }
 
 /**
  * Format currency amount for display
  */
-export function formatCurrency(amount: number, suffix: string = 'Lacs'): string {
+export function formatCurrency(amount: number, suffix: string = 'Crore'): string {
   if (amount === 0) return `Rs. 0.00 ${suffix}`;
   return `Rs. ${amount.toFixed(2)} ${suffix}`;
+}
+
+/**
+ * Format turnover amount - display in Lakhs if beyond 2 decimal places in Crores
+ */
+export function formatTurnoverAmount(amountInCrores: number): string {
+  // If amount is less than 0.01 Crores (1 Lakh), display in Lakhs
+  if (amountInCrores < 0.01) {
+    const amountInLakhs = amountInCrores * 100;
+    return `Rs. ${amountInLakhs.toFixed(2)} Lakh`;
+  }
+  
+  // If amount has more than 2 decimal places, display in Lakhs
+  const roundedCrores = Math.round(amountInCrores * 100) / 100;
+  if (Math.abs(amountInCrores - roundedCrores) > 0.001) {
+    const amountInLakhs = amountInCrores * 100;
+    return `Rs. ${amountInLakhs.toFixed(2)} Lakh`;
+  }
+  
+  // Otherwise display in Crores
+  return `Rs. ${amountInCrores.toFixed(2)} Crore`;
+}
+
+/**
+ * Format Past Performance amount in units
+ */
+export function formatPastPerformance(amount: number): string {
+  if (amount === 0) return '0 Units';
+  return `${amount.toLocaleString()} Units`;
 }
 
 /**

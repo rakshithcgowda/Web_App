@@ -2,7 +2,7 @@ import type { User, LoginCredentials, RegisterData, ApiResponse } from '@/types'
 import { API_ENDPOINTS } from '@/utils/constants';
 
 class AuthService {
-  private baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
+  private baseURL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? window.location.origin : 'http://localhost:3002');
 
   async login(credentials: LoginCredentials): Promise<ApiResponse<{ user: User; token: string }>> {
     try {

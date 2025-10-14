@@ -15,7 +15,8 @@ export function FormStats({
   completedSections, 
   totalSections, 
   estimatedValue, 
-  lastSaved 
+  lastSaved,
+  ...props
 }: FormStatsProps) {
   const completionPercentage = Math.round((completedSections / totalSections) * 100);
   
@@ -47,27 +48,31 @@ export function FormStats({
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10" {...props}>
       {stats.map((stat) => (
         <div key={stat.name} className="card hover-lift animate-fade-in">
-          <div className="card-body">
-            <div className="flex items-center justify-between">
+          <div className="card-body p-8">
+            <div className="flex items-center justify-between mb-6">
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-600 mb-1">{stat.name}</p>
-                <p className="text-2xl font-bold text-gray-900 mb-1">{stat.value}</p>
-                <p className="text-xs text-gray-500">{stat.subValue}</p>
+                <p className="text-base font-semibold text-gray-600 mb-2 tracking-wide">{stat.name}</p>
+                <p className="text-3xl font-bold text-gray-900 mb-2">{stat.value}</p>
+                <p className="text-sm text-gray-500 font-medium">{stat.subValue}</p>
               </div>
-              <div className={`h-12 w-12 bg-gradient-to-r ${stat.bgColor} rounded-xl flex items-center justify-center shadow-lg float`}>
-                <stat.icon className="h-6 w-6 text-white" />
+              <div className={`h-16 w-16 bg-gradient-to-br ${stat.bgColor} rounded-2xl flex items-center justify-center shadow-xl float`}>
+                <stat.icon className="h-8 w-8 text-white" />
               </div>
             </div>
             
-            {/* Progress bar for completion */}
+            {/* Enhanced Progress bar for completion */}
             {stat.name === 'Completion' && (
-              <div className="mt-4">
-                <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-gray-600">Progress</span>
+                  <span className="text-sm font-bold text-gray-900">{completionPercentage}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                   <div 
-                    className={`h-2 rounded-full bg-gradient-to-r ${stat.bgColor} transition-all duration-500 ease-out progress-${Math.round(completionPercentage / 10) * 10}`}
+                    className={`h-3 rounded-full bg-gradient-to-r ${stat.bgColor} transition-all duration-700 ease-out progress-${Math.round(completionPercentage / 10) * 10} shadow-inner`}
                     role="progressbar"
                     aria-label={`Form completion: ${completionPercentage}%`}
                     title={`${completionPercentage}% complete`}
