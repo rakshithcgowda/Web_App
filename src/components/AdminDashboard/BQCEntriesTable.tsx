@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { adminService, type BQCEntry, type BQCEntriesResponse } from '@/services/admin';
+import { adminService, type BQCEntriesResponse } from '@/services/admin';
 import { LoadingSkeleton } from '../LoadingSkeleton';
 
 interface BQCEntriesTableProps {

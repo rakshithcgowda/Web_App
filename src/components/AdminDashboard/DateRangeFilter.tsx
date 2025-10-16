@@ -1,14 +1,16 @@
 import React from 'react';
 import type { GroupOption } from '@/types';
 
+interface FilterType {
+  startDate: string;
+  endDate: string;
+  groupName: string;
+  groupBy: 'day' | 'week' | 'month';
+}
+
 interface DateRangeFilterProps {
-  filters: {
-    startDate: string;
-    endDate: string;
-    groupName: string;
-    groupBy: 'day' | 'week' | 'month';
-  };
-  onFilterChange: (filters: Partial<typeof filters>) => void;
+  filters: FilterType;
+  onFilterChange: (filters: Partial<FilterType>) => void;
   onExport: (format: 'csv' | 'excel') => void;
   groupOptions: GroupOption[];
 }
