@@ -1,6 +1,7 @@
 import type { BQCData } from '@/types';
 import { MANUFACTURER_TYPES, COMMERCIAL_EVALUATION_OPTIONS } from '@/utils/constants';
 import { formatCurrency, formatPercentage, formatTurnoverAmount } from '@/utils/calculations';
+import { ExplanatoryNote } from '../ExplanatoryNote';
 
 interface BQCSectionProps {
   data: BQCData;
@@ -117,8 +118,8 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
                 />
               </div>
 
-              {/* MSE Relaxation for Service/Works with LCS */}
-              {(data.tenderType === 'Service' || data.tenderType === 'Works') && data.evaluationMethodology === 'LCS' && (
+              {/* MSE Relaxation for Service/Works with least cash outflow */}
+              {(data.tenderType === 'Service' || data.tenderType === 'Works') && data.evaluationMethodology === 'least cash outflow' && (
                 <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
                   <div className="flex items-center">
                     <input
@@ -139,7 +140,7 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
               <div className="bg-blue-50 p-4 rounded-lg">
                 <h6 className="text-sm font-medium text-gray-900 mb-2">Experience Requirements:</h6>
                 <div className="space-y-1 text-sm text-blue-900">
-                  {(data.tenderType === 'Service' || data.tenderType === 'Works') && data.evaluationMethodology === 'LCS' && data.mseRelaxation ? (
+                  {(data.tenderType === 'Service' || data.tenderType === 'Works') && data.evaluationMethodology === 'least cash outflow' && data.mseRelaxation ? (
                     /* Show both MSE and non-MSE values when MSE relaxation is enabled */
                     <div className="space-y-3">
                       {/* Non-MSE (Standard) Requirements */}
@@ -174,6 +175,16 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
               </div>
             </div>
           )}
+
+          {/* Explanatory Note for Experience Requirements */}
+          <ExplanatoryNote
+            label="Experience Requirements"
+            checked={data.hasExperienceExplanatoryNote || false}
+            onCheckedChange={(checked) => onChange({ hasExperienceExplanatoryNote: checked })}
+            value={data.experienceExplanatoryNote || ''}
+            onValueChange={(value) => onChange({ experienceExplanatoryNote: value })}
+            placeholder="Add any additional information about experience requirements..."
+          />
         </div>
 
         {/* Commercial Evaluation Method */}
@@ -230,8 +241,8 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
             </p>
           </div>
           
-          {data.evaluationMethodology === 'LCS' ? (
-            /* LCS - Show calculated turnover */
+          {data.evaluationMethodology === 'least cash outflow' ? (
+            /* least cash outflow - Show calculated turnover */
             <div className="bg-green-50 p-4 rounded-lg">
               <h5 className="text-sm font-medium text-gray-900 mb-2">Annual Turnover Requirement</h5>
               <p className="text-lg font-semibold text-green-900">
@@ -276,6 +287,16 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
             </div>
           )}
         </div>
+
+        {/* Explanatory Note for Financial Criteria */}
+        <ExplanatoryNote
+          label="Financial Criteria"
+          checked={data.hasFinancialExplanatoryNote || false}
+          onCheckedChange={(checked) => onChange({ hasFinancialExplanatoryNote: checked })}
+          value={data.financialExplanatoryNote || ''}
+          onValueChange={(value) => onChange({ financialExplanatoryNote: value })}
+          placeholder="Add any additional information about financial criteria..."
+        />
         </div>
       </div>
     </div>

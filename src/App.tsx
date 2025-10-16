@@ -1,6 +1,8 @@
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { AuthPage } from '@/pages/AuthPage';
 import { Dashboard } from '@/pages/Dashboard';
+import AdminPage from '@/pages/AdminPage';
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -16,7 +18,28 @@ function AppContent() {
     );
   }
 
-  return isAuthenticated ? <Dashboard /> : <AuthPage />;
+  return (
+    <Router>
+      <Routes>
+        <Route 
+          path="/auth" 
+          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <AuthPage />} 
+        />
+        <Route 
+          path="/dashboard" 
+          element={isAuthenticated ? <Dashboard /> : <Navigate to="/auth" replace />} 
+        />
+        <Route 
+          path="/admin" 
+          element={isAuthenticated ? <AdminPage /> : <Navigate to="/auth" replace />} 
+        />
+        <Route 
+          path="/" 
+          element={<Navigate to={isAuthenticated ? "/dashboard" : "/auth"} replace />} 
+        />
+      </Routes>
+    </Router>
+  );
 }
 
 function App() {

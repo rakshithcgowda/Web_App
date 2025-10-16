@@ -1,6 +1,7 @@
 // import React from 'react';
 import type { BQCData } from '@/types';
 import { formatPastPerformance } from '@/utils/calculations';
+import { ExplanatoryNote } from '../ExplanatoryNote';
 
 interface ScopeSectionProps {
   data: BQCData;
@@ -40,32 +41,27 @@ export function ScopeSection({ data, onChange, calculatedValues }: ScopeSectionP
           />
         </div>
 
-        {/* Quantity Supplied - Only show for LCS */}
-        {data.evaluationMethodology === 'LCS' && (
+        {/* Quantity Supplied - Only show for Goods tender type */}
+        {data.tenderType === 'Goods' && data.evaluationMethodology === 'least cash outflow' && (
           <div>
             <label htmlFor="quantitySupplied" className="form-label">
               Quantity Supplied *
             </label>
-            <div className="relative">
-              <input
-                type="number"
-                id="quantitySupplied"
-                className="form-input pr-16"
-                placeholder="0"
-                step="1"
-                min="0"
-                value={data.quantitySupplied || ''}
-                onChange={(e) => onChange({ quantitySupplied: parseInt(e.target.value) || 0 })}
-              />
-              <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm text-gray-500">
-                Crore
-              </span>
-            </div>
+            <input
+              type="number"
+              id="quantitySupplied"
+              className="form-input"
+              placeholder="0"
+              step="1"
+              min="0"
+              value={data.quantitySupplied || ''}
+              onChange={(e) => onChange({ quantitySupplied: parseInt(e.target.value) || 0 })}
+            />
           </div>
         )}
 
-        {/* Contract Period - Only show for LCS */}
-        {data.evaluationMethodology === 'LCS' && (
+        {/* Contract Period - Only show for least cash outflow */}
+        {data.evaluationMethodology === 'least cash outflow' && (
           <div>
             <label htmlFor="contractPeriodMonths" className="form-label">
               Contract Period *
@@ -95,21 +91,71 @@ export function ScopeSection({ data, onChange, calculatedValues }: ScopeSectionP
           </div>
         )}
 
-            {/* Calculation Display - Different for LCS vs Lot-wise */}
-            {data.evaluationMethodology === 'LCS' ? (
-              /* LCS - Single Past Performance Value */
-              <div className="calculation-display">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="form-label text-blue-700">Past Performance Requirement</label>
-                  <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+            {/* Calculation Display - Different for least cash outflow vs Lot-wise - Only show for Goods */}
+            {data.tenderType === 'Goods' && data.evaluationMethodology === 'least cash outflow' ? (
+              /* least cash outflow - Single Past Performance Value */
+              <div className="space-y-4">
+                {/* MSE Relaxation Checkbox for Past Performance */}
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="pastPerformanceMseRelaxation"
+                      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                      checked={data.pastPerformanceMseRelaxation || false}
+                      onChange={(e) => onChange({ pastPerformanceMseRelaxation: e.target.checked })}
+                    />
+                    <label htmlFor="pastPerformanceMseRelaxation" className="ml-2 text-sm font-medium text-gray-700">
+                      Apply MSE Relaxation (15% reduction) for Past Performance Requirement
+                    </label>
+                  </div>
                 </div>
-                <p className="calculation-value">
-                  {formatPastPerformance(calculatedValues.pastPerformance)}
-                </p>
+
+                {/* Past Performance Calculation Display */}
+                <div className="space-y-4">
+                  {/* Non-MSE (Standard) Requirements - Always shown */}
+                  <div className="calculation-display">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="form-label text-blue-700">Non-MSE (Standard) Requirements</label>
+                      <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <p className="calculation-value">
+                      {formatPastPerformance(calculatedValues.pastPerformance)}
+                    </p>
+                  </div>
+
+                  {/* MSE (Relaxed) Requirements - Only shown when MSE relaxation is enabled */}
+                  {data.pastPerformanceMseRelaxation && (
+                    <div className="calculation-display bg-green-50 border border-green-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="form-label text-green-700">MSE (Relaxed) Requirements</label>
+                        <svg className="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <p className="calculation-value text-green-800">
+                        {formatPastPerformance(calculatedValues.pastPerformance * 0.85)}
+                        <span className="ml-2 text-sm text-green-600 font-medium">
+                          (MSE -15%)
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Explanatory Note for Past Performance */}
+                <ExplanatoryNote
+                  label="Past Performance Requirement"
+                  checked={data.hasPastPerformanceExplanatoryNote || false}
+                  onCheckedChange={(checked) => onChange({ hasPastPerformanceExplanatoryNote: checked })}
+                  value={data.pastPerformanceExplanatoryNote || ''}
+                  onValueChange={(value) => onChange({ pastPerformanceExplanatoryNote: value })}
+                  placeholder="Enter explanatory note for Past Performance Requirement..."
+                />
               </div>
-        ) : (
+        ) : data.tenderType === 'Goods' ? (
           /* Lot-wise - Individual Calculations Notice */
           <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-6">
             <div className="flex items-center space-x-2 mb-4">
@@ -142,10 +188,10 @@ export function ScopeSection({ data, onChange, calculatedValues }: ScopeSectionP
               )}
             </div>
           </div>
-        )}
+        ) : null}
 
-        {/* AMC Section - Only show for LCS */}
-        {data.evaluationMethodology === 'LCS' && (
+        {/* AMC Section - Only show for least cash outflow */}
+        {data.evaluationMethodology === 'least cash outflow' && (
           <div className="card">
           <div className="card-header">
             <div className="flex items-center space-x-3">

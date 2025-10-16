@@ -1,7 +1,8 @@
 import express from 'express';
-import { database } from '../models/database';
+import { database } from '../models/database-adapter';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType } from 'docx';
+import { convertHtmlToWordRuns } from '../utils/htmlToWord';
 
 const router = express.Router();
 
@@ -14,8 +15,8 @@ router.post('/save', async (req: AuthRequest, res) => {
     const bqcData = req.body;
     const userId = req.userId!;
 
-    // Validate required fields
-    if (!bqcData.refNumber) {
+    // Only validate critical fields - other fields will be filled with defaults
+    if (!bqcData.refNumber || bqcData.refNumber.trim() === '') {
       return res.status(400).json({
         success: false,
         message: 'Reference number is required'
@@ -68,7 +69,7 @@ router.get('/load/:id', async (req: AuthRequest, res) => {
       tenderDescription: bqcData.tender_description,
       prReference: bqcData.pr_reference,
       tenderType: bqcData.tender_type,
-      evaluationMethodology: bqcData.evaluation_methodology || 'LCS',
+      evaluationMethodology: bqcData.evaluation_methodology || 'least cash outflow',
       cecEstimateInclGst: bqcData.cec_estimate_incl_gst,
       cecDate: bqcData.cec_date,
       cecEstimateExclGst: bqcData.cec_estimate_excl_gst,
@@ -107,7 +108,19 @@ router.get('/load/:id', async (req: AuthRequest, res) => {
       hasOm: Boolean(bqcData.has_om),
       additionalDetails: bqcData.additional_details || '',
       noteTo: bqcData.note_to || '',
-      commercialEvaluationMethod: bqcData.commercial_evaluation_method || []
+      commercialEvaluationMethod: bqcData.commercial_evaluation_method || [],
+      // Explanatory Notes
+      hasExperienceExplanatoryNote: Boolean(bqcData.has_experience_explanatory_note),
+      experienceExplanatoryNote: bqcData.experience_explanatory_note || '',
+      hasAdditionalExplanatoryNote: Boolean(bqcData.has_additional_explanatory_note),
+      additionalExplanatoryNote: bqcData.additional_explanatory_note || '',
+      hasFinancialExplanatoryNote: Boolean(bqcData.has_financial_explanatory_note),
+      financialExplanatoryNote: bqcData.financial_explanatory_note || '',
+      hasEMDExplanatoryNote: Boolean(bqcData.has_emd_explanatory_note),
+      emdExplanatoryNote: bqcData.emd_explanatory_note || '',
+      hasPastPerformanceExplanatoryNote: Boolean(bqcData.has_past_performance_explanatory_note),
+      pastPerformanceExplanatoryNote: bqcData.past_performance_explanatory_note || '',
+      pastPerformanceMseRelaxation: Boolean(bqcData.past_performance_mse_relaxation)
     };
 
     res.json({
@@ -278,13 +291,13 @@ router.post('/generate', async (req: AuthRequest, res) => {
       if (data.evaluationMethodology === 'Lot-wise' && data.lots) {
         baseAmount = data.lots.reduce((sum: number, lot) => {
           const lotCEC = lot.cecEstimateInclGst || 0;
-          const lotAMC = (lot.hasAmc && lot.amcValue) ? lot.amcValue : 0;
+          const lotAMC = (lot.hasAmc && lot.amcValue && lot.amcValue > 0) ? lot.amcValue : 0;
           return sum + (lotCEC - lotAMC);
         }, 0);
       } else {
-        // For LCS, use CEC including GST minus AMC
+        // For least cash outflow, use CEC including GST minus AMC
         const cecInclGst = data.cecEstimateInclGst || 0;
-        const amcValue = (data.hasAmc && data.amcValue) ? data.amcValue : 0;
+        const amcValue = (data.hasAmc && data.amcValue && data.amcValue > 0) ? data.amcValue : 0;
         baseAmount = cecInclGst - amcValue;
       }
       
@@ -337,7 +350,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
         optionCPercent = 0.8 * (1 + correctionFactor);
       }
 
-      // Get total CEC values (handles both LCS and lot-wise)
+      // Get total CEC values (handles both least cash outflow and lot-wise)
       let totalCECInclGst = 0;
       if (data.lots && data.lots.length > 0) {
         totalCECInclGst = data.lots.reduce((sum: number, lot: any) => sum + (lot.cecEstimateInclGst || 0), 0);
@@ -363,12 +376,12 @@ router.post('/generate', async (req: AuthRequest, res) => {
         annualizedOptionC = baseOptionC / contractDurationYears;
       }
 
-      // Apply MSE relaxation for Service/Works tenders with LCS if enabled
+      // Apply MSE relaxation for Service/Works tenders with least cash outflow if enabled
       let finalOptionA = annualizedOptionA;
       let finalOptionB = annualizedOptionB;
       let finalOptionC = annualizedOptionC;
 
-      if ((data.tenderType === 'Service' || data.tenderType === 'Works') && data.evaluationMethodology === 'LCS' && data.mseRelaxation) {
+      if ((data.tenderType === 'Service' || data.tenderType === 'Works') && data.evaluationMethodology === 'least cash outflow' && data.mseRelaxation) {
         // Apply 15% relaxation for MSE
         finalOptionA = annualizedOptionA * 0.85;
         finalOptionB = annualizedOptionB * 0.85;
@@ -402,22 +415,44 @@ router.post('/generate', async (req: AuthRequest, res) => {
     };
 
     const formatTurnoverAmount = (amountInCrores: number): string => {
-      // If amount is less than 0.01 Crores (1 Lakh), display in Lakhs
-      if (amountInCrores < 0.01) {
-        const amountInLakhs = amountInCrores * 100;
-        return `Rs. ${amountInLakhs.toFixed(2)} Lakh`;
-      }
-      
-      // If amount has more than 2 decimal places, display in Lakhs
-      const roundedCrores = Math.round(amountInCrores * 100) / 100;
-      if (Math.abs(amountInCrores - roundedCrores) > 0.001) {
-        const amountInLakhs = amountInCrores * 100;
-        return `Rs. ${amountInLakhs.toFixed(2)} Lakh`;
-      }
-      
-      // Otherwise display in Crores
+      // Always display in Crores format
       return `Rs. ${amountInCrores.toFixed(2)} Crore`;
     };
+
+    // Calculate dynamic section numbers based on document structure
+    const getSectionNumbers = () => {
+      const sections = {
+        bqc: 3,        // BID QUALIFICATION CRITERIA
+        evaluation: 5, // EVALUATION METHODOLOGY  
+        emd: 6,        // EARNEST MONEY DEPOSIT
+        performanceSecurity: 7 // PERFORMANCE SECURITY
+      };
+      
+      // Adjust section numbers based on document content
+      let currentSection = 3; // Start from BQC section
+      
+      // BQC section is always 3
+      sections.bqc = currentSection;
+      currentSection += 1;
+      
+      // Evaluation methodology section
+      sections.evaluation = currentSection;
+      currentSection += 1;
+      
+      // EMD section
+      sections.emd = currentSection;
+      currentSection += 1;
+      
+      // Performance Security section (only if applicable)
+      if (bqcData.hasPerformanceSecurity) {
+        sections.performanceSecurity = currentSection;
+        currentSection += 1;
+      }
+      
+      return sections;
+    };
+
+    const sectionNumbers = getSectionNumbers();
 
     // Format number with Indian comma separation for Crore values
     const formatIndianCurrency = (amountInCrores: number): string => {
@@ -428,6 +463,16 @@ router.post('/generate', async (req: AuthRequest, res) => {
       const formattedAmount = actualAmount.toLocaleString('en-IN');
       
       return `₹ ${formattedAmount}`;
+    };
+
+    // Format past performance amount for display
+    const formatPastPerformance = (amountInCrores: number): string => {
+      if (amountInCrores >= 1) {
+        return `${amountInCrores} Crore${amountInCrores > 1 ? 's' : ''}`;
+      } else {
+        const amountInLakhs = amountInCrores * 100;
+        return `${amountInLakhs} Lakh${amountInLakhs > 1 ? 's' : ''}`;
+      }
     };
 
     // Format date to dd/mm/yyyy format
@@ -485,11 +530,16 @@ router.post('/generate', async (req: AuthRequest, res) => {
     let totalCECExclGst = 0;
     let experienceRequirements = null;
 
-    if (bqcData.evaluationMethodology === 'LCS') {
-      // LCS methodology - use main CEC values
+    if (bqcData.evaluationMethodology === 'least cash outflow') {
+      // least cash outflow methodology - use main CEC values
       const quantitySupplied = bqcData.quantitySupplied || 0;
-      pastPerformanceNonMSE = calculatePastPerformance(quantitySupplied, false);
-      pastPerformanceMSE = calculatePastPerformance(quantitySupplied, true);
+      // Only calculate past performance for Goods tender type
+      if (bqcData.tenderType === 'Goods') {
+        pastPerformanceNonMSE = calculatePastPerformance(quantitySupplied, false);
+        // Use the specific MSE relaxation field for Past Performance Requirement
+        const mseRelaxation = bqcData.pastPerformanceMseRelaxation || false;
+        pastPerformanceMSE = calculatePastPerformance(quantitySupplied, mseRelaxation);
+      }
       turnoverAmount = calculateTurnover(bqcData);
       emdAmount = calculateEMD(bqcData.cecEstimateInclGst || 0, bqcData.tenderType || 'Goods');
       totalCECInclGst = bqcData.cecEstimateInclGst || 0;
@@ -501,11 +551,13 @@ router.post('/generate', async (req: AuthRequest, res) => {
         totalCECInclGst = bqcData.lots.reduce((sum: number, lot: any) => sum + (lot.cecEstimateInclGst || 0), 0);
         totalCECExclGst = bqcData.lots.reduce((sum: number, lot: any) => sum + (lot.cecEstimateExclGst || 0), 0);
         
-        // Calculate past performance for each lot
-        pastPerformanceNonMSE = bqcData.lots.reduce((sum: number, lot: any) => 
-          sum + calculatePastPerformance(lot.quantitySupplied || 0, false), 0);
-        pastPerformanceMSE = bqcData.lots.reduce((sum: number, lot: any) => 
-          sum + calculatePastPerformance(lot.quantitySupplied || 0, lot.mseRelaxation || false), 0);
+        // Only calculate past performance for Goods tender type
+        if (bqcData.tenderType === 'Goods') {
+          pastPerformanceNonMSE = bqcData.lots.reduce((sum: number, lot: any) => 
+            sum + calculatePastPerformance(lot.quantitySupplied || 0, false), 0);
+          pastPerformanceMSE = bqcData.lots.reduce((sum: number, lot: any) => 
+            sum + calculatePastPerformance(lot.quantitySupplied || 0, lot.mseRelaxation || false), 0);
+        }
         
         turnoverAmount = calculateTurnover(bqcData);
         emdAmount = calculateEMD(totalCECInclGst, bqcData.tenderType || 'Goods');
@@ -1287,8 +1339,8 @@ router.post('/generate', async (req: AuthRequest, res) => {
                   }),
                 ],
               }),
-              // AMC Period
-              new TableRow({
+              // AMC Period - only show if hasAmc and amcValue > 0
+              ...(bqcData.hasAmc && bqcData.amcValue && bqcData.amcValue > 0 ? [new TableRow({
                 children: [
                   new TableCell({
                     children: [
@@ -1312,7 +1364,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                       new Paragraph({
                         children: [
                           new TextRun({ 
-                            text: bqcData.hasAmc ? `${bqcData.amcPeriod || "N/A"} years` : "N/A", 
+                            text: `${bqcData.amcPeriod || "N/A"} years`, 
                             size: 24,
                             font: "Arial"
                           }),
@@ -1324,7 +1376,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                     width: { size: 70, type: WidthType.PERCENTAGE },
                   }),
                 ],
-              }),
+              })] : []),
               // Payment Terms
               new TableRow({
                 children: [
@@ -1370,14 +1422,14 @@ router.post('/generate', async (req: AuthRequest, res) => {
                       new Paragraph({
                         children: [
                           new TextRun({ 
-                text: "3. BID QUALIFICATION CRITERIA (BQC)", 
+                text: `${sectionNumbers.bqc}. BID QUALIFICATION CRITERIA (BQC)`, 
                             bold: true, 
                             size: 24,
                             font: "Arial"
                           }),
                         ],
             spacing: { after: 200 },
-          }),
+                      }),
           
           new Paragraph({
             children: [
@@ -1439,40 +1491,89 @@ router.post('/generate', async (req: AuthRequest, res) => {
               spacing: { after: 200 },
             }),
             
-              
-                      new Paragraph({
-                        children: [
-                          new TextRun({ 
-                  text: "Supplying Capacity:", 
-                            bold: true, 
-                            size: 24,
-                            font: "Arial"
-                          }),
-                        ],
-              spacing: { after: 100 },
-            }),
-            
-            new Paragraph({
-              children: [
-                new TextRun({ 
-                  text: `The bidder shall have experience of having successfully supplied minimum of ${formatPastPerformance(pastPerformanceNonMSE)} in any 12 continuous months during last 7 years in India or abroad, ending on last day of the month previous to the one in which tender is invited.`, 
-                  size: 24,
-                  font: "Arial"
-                      }),
-                    ],
-              spacing: { after: 200 },
+            // Only show Supplying Capacity section for Goods tender type
+            ...(bqcData.tenderType === 'Goods' ? [
+              new Paragraph({
+                children: [
+                  new TextRun({ 
+                    text: "Supplying Capacity:", 
+                    bold: true, 
+                    size: 24,
+                    font: "Arial"
                   }),
-            
-                      new Paragraph({
-                        children: [
-                          new TextRun({ 
-                  text: "For MSE bidders Relaxation of 15% on the supplying capacity shall be given as per Corp. Finance Circular MA.TEC.POL.CON.3A dated 26.10.2020.", 
-                            size: 24,
-                            font: "Arial"
-                          }),
-                        ],
+                ],
+                spacing: { after: 100 },
+              }),
+              
+              // Always show Non-MSE (Standard) Requirements
+              new Paragraph({
+                children: [
+                  new TextRun({ 
+                    text: "Non-MSE (Standard) Requirements:", 
+                    bold: true,
+                    size: 24,
+                    font: "Arial"
+                  }),
+                ],
+                spacing: { after: 100 },
+              }),
+              
+              new Paragraph({
+                children: [
+                  new TextRun({ 
+                    text: `The bidder shall have experience of having successfully supplied minimum of ${formatPastPerformance(pastPerformanceNonMSE)} in any 12 continuous months during last 7 years in India or abroad, ending on last day of the month previous to the one in which tender is invited.`, 
+                    size: 24,
+                    font: "Arial"
+                  }),
+                ],
+                spacing: { after: 200 },
+              }),
+              
+              // Show MSE (Relaxed) Requirements only when MSE relaxation is enabled
+              ...(bqcData.pastPerformanceMseRelaxation ? [
+                new Paragraph({
+                  children: [
+                    new TextRun({ 
+                      text: "MSE (Relaxed) Requirements:", 
+                      bold: true,
+                      size: 24,
+                      font: "Arial"
+                    }),
+                  ],
+                  spacing: { after: 100 },
+                }),
+                
+                new Paragraph({
+                  children: [
+                    new TextRun({ 
+                      text: `The MSE bidder shall have experience of having successfully supplied minimum of ${formatPastPerformance(pastPerformanceMSE)} in any 12 continuous months during last 7 years in India or abroad, ending on last day of the month previous to the one in which tender is invited.`, 
+                      size: 24,
+                      font: "Arial"
+                    }),
+                  ],
+                  spacing: { after: 200 },
+                }),
+              ] : []),
+              
+              new Paragraph({
+                children: [
+                  new TextRun({ 
+                    text: "For MSE bidders Relaxation of 15% on the supplying capacity shall be given as per Corp. Finance Circular MA.TEC.POL.CON.3A dated 26.10.2020.", 
+                    size: 24,
+                    font: "Arial"
+                  }),
+                ],
+                spacing: { after: 200 },
+              }),
+              
+          // Explanatory Note for Past Performance Requirement
+          ...(bqcData.hasPastPerformanceExplanatoryNote && bqcData.pastPerformanceExplanatoryNote ? [
+            new Paragraph({
+              children: convertHtmlToWordRuns(bqcData.pastPerformanceExplanatoryNote),
               spacing: { after: 200 },
             }),
+          ] : []),
+            ] : []),
             
           ] : []),
           
@@ -1514,7 +1615,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
             }),
             
             // Experience Requirements - Dynamic based on MSE relaxation
-            ...((bqcData.tenderType === 'Service' || bqcData.tenderType === 'Works') && bqcData.evaluationMethodology === 'LCS' && bqcData.mseRelaxation ? [
+            ...((bqcData.tenderType === 'Service' || bqcData.tenderType === 'Works') && bqcData.evaluationMethodology === 'least cash outflow' && bqcData.mseRelaxation ? [
               // Show both Non-MSE and MSE values when MSE relaxation is enabled
               new Paragraph({
                 children: [
@@ -1735,6 +1836,295 @@ router.post('/generate', async (req: AuthRequest, res) => {
             
           ] : []),
           
+          // Explanatory Note for Experience Requirements
+          ...(bqcData.hasExperienceExplanatoryNote && bqcData.experienceExplanatoryNote ? [
+            new Paragraph({
+              children: convertHtmlToWordRuns(bqcData.experienceExplanatoryNote),
+              spacing: { after: 200 },
+            }),
+          ] : []),
+          
+          // Lot-wise Calculations Section - Only for Lot-wise methodology
+          ...(bqcData.evaluationMethodology === 'Lot-wise' && bqcData.lots && bqcData.lots.length > 0 ? [
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "3.1.3 LOT-WISE CALCULATIONS", 
+                  bold: true, 
+                  size: 24,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+            
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "The following calculations are applicable for each lot individually:", 
+                  size: 24,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+            
+            // Lot-wise calculations table
+            new Table({
+              width: {
+                size: 100,
+                type: WidthType.PERCENTAGE,
+              },
+              borders: {
+                top: { style: BorderStyle.SINGLE, size: 1 },
+                bottom: { style: BorderStyle.SINGLE, size: 1 },
+                left: { style: BorderStyle.SINGLE, size: 1 },
+                right: { style: BorderStyle.SINGLE, size: 1 },
+                insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
+                insideVertical: { style: BorderStyle.SINGLE, size: 1 },
+              },
+              rows: [
+                // Header row
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: "Lot", 
+                              bold: true, 
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                      width: { size: 15, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: "CEC (Incl. GST)", 
+                              bold: true, 
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                      width: { size: 15, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: "EMD Amount", 
+                              bold: true, 
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                      width: { size: 15, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: "Turnover Req.", 
+                              bold: true, 
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                      width: { size: 15, type: WidthType.PERCENTAGE },
+                    }),
+                    ...(bqcData.tenderType === 'Goods' ? [
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: "Past Performance", 
+                                bold: true, 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                        width: { size: 20, type: WidthType.PERCENTAGE },
+                      }),
+                    ] : []),
+                    ...((bqcData.tenderType === 'Service' || bqcData.tenderType === 'Works') ? [
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: "Exp. Req. (40%)", 
+                                bold: true, 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                        width: { size: 20, type: WidthType.PERCENTAGE },
+                      }),
+                    ] : []),
+                  ],
+                }),
+                // Data rows for each lot
+                ...bqcData.lots.map((lot: any) => {
+                  const lotEMD = calculateEMD(lot.cecEstimateInclGst || 0, bqcData.tenderType || 'Goods');
+                  const lotTurnover = (lot.cecEstimateInclGst - (lot.hasAmc && lot.amcValue && lot.amcValue > 0 ? lot.amcValue : 0)) * 0.3;
+                  const lotPastPerformance = bqcData.tenderType === 'Goods' ? calculatePastPerformance(lot.quantitySupplied || 0, lot.mseRelaxation || false) : 0;
+                  
+                  // Calculate experience requirements for Service/Works
+                  let lotExperienceReq = 0;
+                  if (bqcData.tenderType === 'Service' || bqcData.tenderType === 'Works') {
+                    const baseAmount = lot.cecEstimateInclGst || 0;
+                    const contractYears = (lot.contractPeriodMonths || 12) / 12;
+                    const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+                    const finalAmount = lot.mseRelaxation ? annualizedAmount * 0.85 : annualizedAmount;
+                    lotExperienceReq = finalAmount * 0.4; // 40%
+                  }
+                  
+                  return new TableRow({
+                    children: [
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: lot.lotNumber || `Lot ${bqcData.lots.indexOf(lot) + 1}`, 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                      }),
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: formatIndianCurrency(lot.cecEstimateInclGst || 0), 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                      }),
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: `Rs. ${lotEMD.toFixed(1)} Lacs`, 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                      }),
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: formatTurnoverAmount(lotTurnover), 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                      }),
+                      ...(bqcData.tenderType === 'Goods' ? [
+                        new TableCell({
+                          children: [
+                            new Paragraph({
+                              children: [
+                                new TextRun({ 
+                                  text: `${lotPastPerformance.toLocaleString()} Units${lot.mseRelaxation ? ' (MSE -15%)' : ''}`, 
+                                  size: 20,
+                                  font: "Arial"
+                                }),
+                              ],
+                              alignment: AlignmentType.CENTER,
+                              spacing: { after: 100 },
+                            }),
+                          ],
+                        }),
+                      ] : []),
+                      ...((bqcData.tenderType === 'Service' || bqcData.tenderType === 'Works') ? [
+                        new TableCell({
+                          children: [
+                            new Paragraph({
+                              children: [
+                                new TextRun({ 
+                                  text: formatExperienceCurrency(lotExperienceReq), 
+                                  size: 20,
+                                  font: "Arial"
+                                }),
+                              ],
+                              alignment: AlignmentType.CENTER,
+                              spacing: { after: 100 },
+                            }),
+                          ],
+                        }),
+                      ] : []),
+                    ],
+                  });
+                }),
+              ],
+            }),
+            
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "", 
+                  size: 24,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 400 },
+            }),
+          ] : []),
+          
           // Financial Criteria
                       new Paragraph({
                         children: [
@@ -1794,16 +2184,14 @@ router.post('/generate', async (req: AuthRequest, res) => {
             spacing: { after: 200 },
           }),
           
-          new Paragraph({
-            children: [
-              new TextRun({ 
-                text: "Documents Required: Please refer the ITB (Instruction to Bidders) which mentions the documents to be submitted by bidders for meeting the above Technical and Financial criteria.", 
-                size: 24,
-                font: "Arial"
-                  }),
-                ],
-            spacing: { after: 200 },
-              }),
+          // Explanatory Note for Financial Criteria
+          ...(bqcData.hasFinancialExplanatoryNote && bqcData.financialExplanatoryNote ? [
+            new Paragraph({
+              children: convertHtmlToWordRuns(bqcData.financialExplanatoryNote),
+              spacing: { after: 200 },
+            }),
+          ] : []),
+          
               
                       new Paragraph({
                         children: [
@@ -1864,11 +2252,19 @@ router.post('/generate', async (req: AuthRequest, res) => {
             })
           ] : []),
           
+          // Explanatory Note for Additional Details
+          ...(bqcData.hasAdditionalExplanatoryNote && bqcData.additionalExplanatoryNote ? [
+            new Paragraph({
+              children: convertHtmlToWordRuns(bqcData.additionalExplanatoryNote),
+              spacing: { after: 200 },
+            }),
+          ] : []),
+          
           // Evaluation Methodology
                       new Paragraph({
                         children: [
                           new TextRun({ 
-                text: "5. EVALUATION METHODOLOGY", 
+                text: `${sectionNumbers.evaluation}. EVALUATION METHODOLOGY`, 
                 bold: true, 
                             size: 24,
                             font: "Arial"
@@ -1899,14 +2295,16 @@ router.post('/generate', async (req: AuthRequest, res) => {
              spacing: { after: 200 },
                        }),
           
-                      new Paragraph({
-                        children: [
-                          new TextRun({ 
-                text: "The order will be placed based on above methodology AND Purchase preference based on MSE/ PPP-MII Policy.", 
-                            size: 24,
-                            font: "Arial"
-                          }),
-                        ],
+          new Paragraph({
+            children: [
+              new TextRun({ 
+                text: bqcData.tenderType === 'Works' 
+                  ? "The order will be placed based on above methodology AND Purchase preference based on PPP-MII Policy."
+                  : "The order will be placed based on above methodology AND Purchase preference based on MSE/ PPP-MII Policy.", 
+                size: 24,
+                font: "Arial"
+              }),
+            ],
             spacing: { after: 200 },
           }),
           
@@ -1925,7 +2323,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                       new Paragraph({
                         children: [
                           new TextRun({ 
-                text: "6. EARNEST MONEY DEPOSIT (EMD)", 
+                text: `${sectionNumbers.emd}. EARNEST MONEY DEPOSIT (EMD)`, 
                             bold: true, 
                             size: 24,
                             font: "Arial"
@@ -1956,12 +2354,20 @@ router.post('/generate', async (req: AuthRequest, res) => {
             spacing: { after: 400 },
           }),
           
+          // Explanatory Note for EMD
+          ...(bqcData.hasEMDExplanatoryNote && bqcData.emdExplanatoryNote ? [
+            new Paragraph({
+              children: convertHtmlToWordRuns(bqcData.emdExplanatoryNote),
+              spacing: { after: 200 },
+            }),
+          ] : []),
+          
           // Performance Security - Only if enabled
           ...(bqcData.hasPerformanceSecurity ? [
             new Paragraph({
               children: [
                 new TextRun({ 
-                  text: "7. Performance Security (if at variance with the ITB clause):", 
+                  text: `${sectionNumbers.performanceSecurity}. Performance Security (if at variance with the ITB clause):`, 
                   bold: true, 
                   size: 24,
                   font: "Arial"
@@ -2009,7 +2415,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                       new Paragraph({
                         children: [
                           new TextRun({ 
-                text: "Bid Qualification Criteria as per Sr. No. 3, as per Clause 13.8 of Guidelines for procurement of Goods and Contract Services.", 
+                text: `Bid Qualification Criteria as per Sr. No. ${sectionNumbers.bqc}, as per Clause 13.8 of Guidelines for procurement of Goods and Contract Services.`, 
                             size: 24,
                             font: "Arial"
                           }),
@@ -2020,7 +2426,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                       new Paragraph({
                         children: [
                           new TextRun({ 
-                text: "Inviting bids (two-part bid) through a Domestic Open Tender and adopting evaluation methodology as per Sr. No. 5 above.", 
+                text: `Inviting bids (two-part bid) through a Domestic Open Tender and adopting evaluation methodology as per Sr. No. ${sectionNumbers.evaluation} above.`, 
                             size: 24,
                             font: "Arial"
                           }),
@@ -2031,7 +2437,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
           new Paragraph({
             children: [
               new TextRun({ 
-                text: `Earnest Money Deposit as per Sr. No. 6 above.${bqcData.hasPerformanceSecurity ? '/ Performance Security as per Sr. No. 7 (if applicable)' : ''}`, 
+                text: `Earnest Money Deposit as per Sr. No. ${sectionNumbers.emd} above.${bqcData.hasPerformanceSecurity ? `/ Performance Security as per Sr. No. ${sectionNumbers.performanceSecurity} (if applicable)` : ''}`, 
                 size: 24,
                 font: "Arial"
                   }),

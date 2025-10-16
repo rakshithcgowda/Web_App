@@ -1,7 +1,139 @@
 import type { BQCData, ValidationError } from '@/types';
 
 /**
- * Validate BQC form data
+ * Fill empty fields with default values to ensure data is always saved
+ */
+export function fillEmptyFieldsWithDefaults(data: BQCData): BQCData {
+  const filledData = { ...data };
+  
+  // String fields that should be filled with 'NA' if empty
+  const stringFields: Array<keyof BQCData> = [
+    'subject',
+    'tenderDescription', 
+    'prReference',
+    'budgetDetails',
+    'scopeOfWork',
+    'bidValidityPeriod',
+    'deliveryPeriod',
+    'warrantyPeriod',
+    'amcPeriod',
+    'paymentTerms',
+    'similarWorkDefinition',
+    'escalationClause',
+    'performanceSecurity',
+    'proposedByDesignation',
+    'recommendedByDesignation',
+    'concurredByDesignation',
+    'approvedByDesignation',
+    'omPeriod',
+    'additionalDetails',
+    'experienceExplanatoryNote',
+    'additionalExplanatoryNote',
+    'financialExplanatoryNote',
+    'emdExplanatoryNote',
+    'pastPerformanceExplanatoryNote'
+  ];
+
+  // Fill string fields with 'NA' if empty
+  for (const field of stringFields) {
+    const value = filledData[field];
+    if (!value || (typeof value === 'string' && value.trim() === '')) {
+      (filledData as any)[field] = 'NA';
+    }
+  }
+
+  // Fill numeric fields with 0 if empty or invalid
+  const numericFields: Array<keyof BQCData> = [
+    'cecEstimateInclGst',
+    'cecEstimateExclGst',
+    'quantitySupplied',
+    'contractDurationYears',
+    'annualizedValue',
+    'amcValue',
+    'correctionFactor',
+    'omValue'
+  ];
+
+  for (const field of numericFields) {
+    const value = filledData[field];
+    if (value === undefined || value === null || (typeof value === 'number' && isNaN(value))) {
+      (filledData as any)[field] = 0;
+    }
+  }
+
+  // Ensure arrays are not empty
+  if (!filledData.manufacturerTypes || filledData.manufacturerTypes.length === 0) {
+    filledData.manufacturerTypes = ['Original Equipment Manufacturer'];
+  }
+
+  if (!filledData.commercialEvaluationMethod || filledData.commercialEvaluationMethod.length === 0) {
+    filledData.commercialEvaluationMethod = [];
+  }
+
+  if (!filledData.lots || filledData.lots.length === 0) {
+    filledData.lots = [];
+  }
+
+  // Ensure supplyingCapacity has proper structure
+  if (!filledData.supplyingCapacity) {
+    filledData.supplyingCapacity = {
+      calculated: 30,
+      final: 30,
+      mseAdjusted: undefined
+    };
+  }
+
+  return filledData;
+}
+
+/**
+ * Check if any fields were filled with default values
+ */
+export function getFieldsFilledWithDefaults(originalData: BQCData, filledData: BQCData): string[] {
+  const filledFields: string[] = [];
+  
+  // String fields that could be filled with 'NA'
+  const stringFields: Array<keyof BQCData> = [
+    'subject',
+    'tenderDescription', 
+    'prReference',
+    'budgetDetails',
+    'scopeOfWork',
+    'bidValidityPeriod',
+    'deliveryPeriod',
+    'warrantyPeriod',
+    'amcPeriod',
+    'paymentTerms',
+    'similarWorkDefinition',
+    'escalationClause',
+    'performanceSecurity',
+    'proposedByDesignation',
+    'recommendedByDesignation',
+    'concurredByDesignation',
+    'approvedByDesignation',
+    'omPeriod',
+    'additionalDetails',
+    'experienceExplanatoryNote',
+    'additionalExplanatoryNote',
+    'financialExplanatoryNote',
+    'emdExplanatoryNote',
+    'pastPerformanceExplanatoryNote'
+  ];
+
+  for (const field of stringFields) {
+    const originalValue = originalData[field];
+    const filledValue = filledData[field];
+    if ((!originalValue || (typeof originalValue === 'string' && originalValue.trim() === '')) && 
+        filledValue === 'NA') {
+      filledFields.push(field);
+    }
+  }
+
+  return filledFields;
+}
+
+/**
+ * Validate BQC form data - Modified to allow saving with default values
  */
 export function validateBQCData(data: BQCData): {
   isValid: boolean;
@@ -9,17 +141,13 @@ export function validateBQCData(data: BQCData): {
 } {
   const errors: ValidationError[] = [];
 
-  // Required fields validation
-  const requiredFields: Array<{ key: keyof BQCData; label: string }> = [
-    { key: 'refNumber', label: 'Reference Number' },
-    { key: 'tenderDescription', label: 'Tender Description' },
-    { key: 'prReference', label: 'PR Reference' },
-    { key: 'budgetDetails', label: 'Budget Details' },
-    { key: 'scopeOfWork', label: 'Scope of Work' },
-    { key: 'bidValidityPeriod', label: 'Bid Validity Period' }
+  // Only validate critical fields that are absolutely necessary
+  // Other fields will be filled with default values during save
+  const criticalFields: Array<{ key: keyof BQCData; label: string }> = [
+    { key: 'refNumber', label: 'Reference Number' }
   ];
 
-  for (const { key, label } of requiredFields) {
+  for (const { key, label } of criticalFields) {
     const value = data[key];
     if (!value || (typeof value === 'string' && value.trim() === '')) {
       errors.push({
@@ -29,19 +157,19 @@ export function validateBQCData(data: BQCData): {
     }
   }
 
-  // Numeric validation - only required for LCS methodology
-  if (data.evaluationMethodology === 'LCS') {
+  // Numeric validation - only required for least cash outflow methodology
+  if (data.evaluationMethodology === 'least cash outflow') {
     if (data.cecEstimateInclGst <= 0) {
       errors.push({
         field: 'cecEstimateInclGst',
-        message: 'CEC Estimate (incl. GST) must be greater than 0 for LCS methodology'
+        message: 'CEC Estimate (incl. GST) must be greater than 0 for least cash outflow methodology'
       });
     }
 
     if (data.cecEstimateExclGst <= 0) {
       errors.push({
         field: 'cecEstimateExclGst',
-        message: 'CEC Estimate (excl. GST) must be greater than 0 for LCS methodology'
+        message: 'CEC Estimate (excl. GST) must be greater than 0 for least cash outflow methodology'
       });
     }
   }
@@ -65,17 +193,19 @@ export function validateBQCData(data: BQCData): {
         });
       }
 
-      // Validate quantity supplied is whole number for Past Performance calculation
-      data.lots.forEach((lot, index) => {
-        if (lot.quantitySupplied !== undefined && lot.quantitySupplied !== null) {
-          if (!Number.isInteger(lot.quantitySupplied) || lot.quantitySupplied < 0) {
-            errors.push({
-              field: 'lots',
-              message: `Lot ${index + 1}: Quantity Supplied must be a whole number (non-negative integer) for Past Performance calculation`
-            });
+      // Validate quantity supplied is whole number for Past Performance calculation (only for Goods)
+      if (data.tenderType === 'Goods') {
+        data.lots.forEach((lot, index) => {
+          if (lot.quantitySupplied !== undefined && lot.quantitySupplied !== null) {
+            if (!Number.isInteger(lot.quantitySupplied) || lot.quantitySupplied < 0) {
+              errors.push({
+                field: 'lots',
+                message: `Lot ${index + 1}: Quantity Supplied must be a whole number (non-negative integer) for Past Performance calculation`
+              });
+            }
           }
-        }
-      });
+        });
+      }
     }
   }
 
@@ -110,9 +240,9 @@ export function validateBQCData(data: BQCData): {
     }
   }
 
-  // Service with LCS evaluation methodology validation
-  if (data.tenderType === 'Service' && data.evaluationMethodology === 'LCS') {
-    // MSE relaxation is optional for Service tenders with LCS
+  // Service with least cash outflow evaluation methodology validation
+  if (data.tenderType === 'Service' && data.evaluationMethodology === 'least cash outflow') {
+    // MSE relaxation is optional for Service tenders with least cash outflow
     // No additional validation required as it's a boolean field
   }
 

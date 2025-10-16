@@ -38,7 +38,7 @@ export const DIVISION_PATTERNS = ['80:20', '70:20:10'] as const;
 
 export const PLATFORM_OPTIONS = ['GeM', 'E-procurement'] as const;
 
-export const EVALUATION_METHODOLOGY_OPTIONS = ['LCS', 'Lot-wise'] as const;
+export const EVALUATION_METHODOLOGY_OPTIONS = ['least cash outflow', 'Lot-wise'] as const;
 
 export const COMMERCIAL_EVALUATION_OPTIONS = [
   'Overall Lowest Basis',
@@ -62,7 +62,7 @@ export const DEFAULT_BQC_DATA = {
   tenderDescription: '',
   prReference: '',
   tenderType: 'Goods' as const,
-  evaluationMethodology: 'LCS' as const,
+  evaluationMethodology: 'least cash outflow' as const,
   cecEstimateInclGst: 0,
   cecDate: new Date().toISOString().split('T')[0],
   cecEstimateExclGst: 0,
@@ -89,7 +89,7 @@ export const DEFAULT_BQC_DATA = {
   annualizedValue: 0,
   escalationClause: '',
   divisibility: 'Non-Divisible' as const,
-  performanceSecurity: 5,
+  performanceSecurity: '5',
   hasPerformanceSecurity: false,
   proposedBy: 'XXXXX',
   proposedByDesignation: '',
@@ -107,7 +107,20 @@ export const DEFAULT_BQC_DATA = {
   hasOm: false,
   additionalDetails: '',
   commercialEvaluationMethod: [],
-  noteTo: 'CHIEF PROCUREMENT OFFICER, CPO (M)'
+  noteTo: 'CHIEF PROCUREMENT OFFICER, CPO (M)',
+  // Explanatory Notes
+  hasExperienceExplanatoryNote: false,
+  experienceExplanatoryNote: '',
+  hasAdditionalExplanatoryNote: false,
+  additionalExplanatoryNote: '',
+  hasFinancialExplanatoryNote: false,
+  financialExplanatoryNote: '',
+  hasEMDExplanatoryNote: false,
+  emdExplanatoryNote: '',
+  hasPastPerformanceExplanatoryNote: false,
+  pastPerformanceExplanatoryNote: '',
+  // MSE Relaxation for Past Performance Requirement
+  pastPerformanceMseRelaxation: false
 };
 
 export const API_ENDPOINTS = {
@@ -123,5 +136,15 @@ export const API_ENDPOINTS = {
     LIST: '/api/bqc/list',
     DELETE: '/api/bqc/delete',
     GENERATE: '/api/bqc/generate'
+  },
+  ADMIN: {
+    STATS_OVERVIEW: '/api/admin/stats/overview',
+    STATS_GROUPS: '/api/admin/stats/groups',
+    STATS_DATE_RANGE: '/api/admin/stats/date-range',
+    STATS_USERS: '/api/admin/stats/users',
+    STATS_TENDER_TYPES: '/api/admin/stats/tender-types',
+    STATS_FINANCIAL: '/api/admin/stats/financial',
+    BQC_ENTRIES: '/api/admin/bqc-entries',
+    EXPORT: '/api/admin/export'
   }
 } as const;

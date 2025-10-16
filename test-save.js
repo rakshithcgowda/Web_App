@@ -71,7 +71,7 @@ const testDatabase = () => {
       tenderDescription: 'Test Tender',
       prReference: 'PR-001',
       tenderType: 'Goods',
-      evaluationMethodology: 'LCS',
+      evaluationMethodology: 'least cash outflow',
       cecEstimateInclGst: 100,
       cecDate: '2024-01-01',
       cecEstimateExclGst: 90,

@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth';
 import bqcRoutes from './routes/bqc';
+import adminRoutes from './routes/admin';
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -46,6 +47,7 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/bqc', bqcRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

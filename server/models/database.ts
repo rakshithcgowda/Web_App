@@ -99,6 +99,14 @@ class Database {
         additional_details TEXT,
         note_to TEXT,
         commercial_evaluation_method TEXT,
+        has_experience_explanatory_note INTEGER,
+        experience_explanatory_note TEXT,
+        has_additional_explanatory_note INTEGER,
+        additional_explanatory_note TEXT,
+        has_financial_explanatory_note INTEGER,
+        financial_explanatory_note TEXT,
+        has_emd_explanatory_note INTEGER,
+        emd_explanatory_note TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users (id)
@@ -123,6 +131,92 @@ class Database {
       if (err && !err.message.includes('duplicate column name')) {
         console.error('Error adding bid_validity_period column:', err);
       }
+    });
+
+    // Add migration for explanatory note fields
+    const explanatoryNoteFields = [
+      'has_experience_explanatory_note INTEGER',
+      'experience_explanatory_note TEXT',
+      'has_additional_explanatory_note INTEGER',
+      'additional_explanatory_note TEXT',
+      'has_financial_explanatory_note INTEGER',
+      'financial_explanatory_note TEXT',
+      'has_emd_explanatory_note INTEGER',
+      'emd_explanatory_note TEXT',
+      'has_past_performance_explanatory_note INTEGER',
+      'past_performance_explanatory_note TEXT',
+      'past_performance_mse_relaxation INTEGER'
+    ];
+
+    explanatoryNoteFields.forEach(field => {
+      this.db.run(`
+        ALTER TABLE bqc_data ADD COLUMN ${field}
+      `, (err) => {
+        // Ignore error if column already exists
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error(`Error adding ${field} column:`, err);
+        }
+      });
+    });
+
+    // Add migration for missing columns that might not exist
+    const missingColumns = [
+      'evaluation_methodology TEXT',
+      'subject TEXT',
+      'tender_description TEXT',
+      'pr_reference TEXT',
+      'tender_type TEXT',
+      'cec_estimate_incl_gst REAL',
+      'cec_date DATE',
+      'cec_estimate_excl_gst REAL',
+      'lots TEXT',
+      'quantity_supplied REAL',
+      'budget_details TEXT',
+      'tender_platform TEXT',
+      'scope_of_work TEXT',
+      'contract_period_months TEXT',
+      'delivery_period TEXT',
+      'bid_validity_period TEXT',
+      'warranty_period TEXT',
+      'amc_period TEXT',
+      'payment_terms TEXT',
+      'manufacturer_types TEXT',
+      'supplying_capacity INTEGER',
+      'mse_relaxation INTEGER',
+      'similar_work_definition TEXT',
+      'annualized_value REAL',
+      'escalation_clause TEXT',
+      'divisibility TEXT',
+      'performance_security INTEGER',
+      'has_performance_security INTEGER',
+      'proposed_by TEXT',
+      'proposed_by_designation TEXT',
+      'recommended_by TEXT',
+      'recommended_by_designation TEXT',
+      'concurred_by TEXT',
+      'concurred_by_designation TEXT',
+      'approved_by TEXT',
+      'approved_by_designation TEXT',
+      'amc_value REAL',
+      'has_amc INTEGER',
+      'correction_factor REAL',
+      'o_m_value REAL',
+      'o_m_period TEXT',
+      'has_om INTEGER',
+      'additional_details TEXT',
+      'note_to TEXT',
+      'commercial_evaluation_method TEXT'
+    ];
+
+    missingColumns.forEach(field => {
+      this.db.run(`
+        ALTER TABLE bqc_data ADD COLUMN ${field}
+      `, (err) => {
+        // Ignore error if column already exists
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error(`Error adding ${field} column:`, err);
+        }
+      });
     });
   }
 
@@ -211,7 +305,10 @@ class Database {
                 divisibility = ?, performance_security = ?, has_performance_security = ?, proposed_by = ?, proposed_by_designation = ?,
                 recommended_by = ?, recommended_by_designation = ?, concurred_by = ?, concurred_by_designation = ?, approved_by = ?, approved_by_designation = ?,
                 amc_value = ?, has_amc = ?, correction_factor = ?,
-                o_m_value = ?, o_m_period = ?, has_om = ?, additional_details = ?, note_to = ?, commercial_evaluation_method = ?, updated_at = CURRENT_TIMESTAMP
+                o_m_value = ?, o_m_period = ?, has_om = ?, additional_details = ?, note_to = ?, commercial_evaluation_method = ?,
+                has_experience_explanatory_note = ?, experience_explanatory_note = ?, has_additional_explanatory_note = ?, additional_explanatory_note = ?,
+                has_financial_explanatory_note = ?, financial_explanatory_note = ?, has_emd_explanatory_note = ?, emd_explanatory_note = ?,
+                has_past_performance_explanatory_note = ?, past_performance_explanatory_note = ?, past_performance_mse_relaxation = ?, updated_at = CURRENT_TIMESTAMP
               WHERE id = ?
             `, [
               bqcData.groupName, bqcData.subject, bqcData.tenderDescription, bqcData.prReference,
@@ -225,7 +322,13 @@ class Database {
               bqcData.recommendedBy, bqcData.recommendedByDesignation, bqcData.concurredBy, bqcData.concurredByDesignation, bqcData.approvedBy, bqcData.approvedByDesignation,
               bqcData.amcValue, bqcData.hasAmc ? 1 : 0, bqcData.correctionFactor,
               bqcData.omValue || 0, bqcData.omPeriod || '', bqcData.hasOm ? 1 : 0,
-              bqcData.additionalDetails, bqcData.noteTo, commercialEvaluationMethodJson, existingRecord.id
+              bqcData.additionalDetails, bqcData.noteTo, commercialEvaluationMethodJson,
+              bqcData.hasExperienceExplanatoryNote ? 1 : 0, bqcData.experienceExplanatoryNote || '',
+              bqcData.hasAdditionalExplanatoryNote ? 1 : 0, bqcData.additionalExplanatoryNote || '',
+              bqcData.hasFinancialExplanatoryNote ? 1 : 0, bqcData.financialExplanatoryNote || '',
+              bqcData.hasEMDExplanatoryNote ? 1 : 0, bqcData.emdExplanatoryNote || '',
+              bqcData.hasPastPerformanceExplanatoryNote ? 1 : 0, bqcData.pastPerformanceExplanatoryNote || '',
+              bqcData.pastPerformanceMseRelaxation ? 1 : 0, existingRecord.id
             ], function(err) {
               if (err) {
                 reject(err);
@@ -245,8 +348,11 @@ class Database {
                 similar_work_definition, annualized_value, escalation_clause,
                 divisibility, performance_security, has_performance_security, proposed_by, proposed_by_designation, recommended_by, recommended_by_designation,
                 concurred_by, concurred_by_designation, approved_by, approved_by_designation, amc_value, has_amc, correction_factor,
-                o_m_value, o_m_period, has_om, additional_details, note_to, commercial_evaluation_method
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                o_m_value, o_m_period, has_om, additional_details, note_to, commercial_evaluation_method,
+                has_experience_explanatory_note, experience_explanatory_note, has_additional_explanatory_note, additional_explanatory_note,
+                has_financial_explanatory_note, financial_explanatory_note, has_emd_explanatory_note, emd_explanatory_note,
+                has_past_performance_explanatory_note, past_performance_explanatory_note, past_performance_mse_relaxation
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
               userId, bqcData.refNumber, bqcData.groupName, bqcData.subject, bqcData.tenderDescription,
               bqcData.prReference, bqcData.tenderType, bqcData.evaluationMethodology, bqcData.cecEstimateInclGst,
@@ -258,8 +364,14 @@ class Database {
               bqcData.annualizedValue, bqcData.escalationClause, bqcData.divisibility,
               bqcData.performanceSecurity, bqcData.hasPerformanceSecurity ? 1 : 0, bqcData.proposedBy, bqcData.proposedByDesignation, bqcData.recommendedBy, bqcData.recommendedByDesignation,
               bqcData.concurredBy, bqcData.concurredByDesignation, bqcData.approvedBy, bqcData.approvedByDesignation, bqcData.amcValue,
-              bqcData.hasAmc ? 1 : 0, bqcData.correctionFactor, bqcData.omValue || 0,
-              bqcData.omPeriod || '', bqcData.hasOm ? 1 : 0, bqcData.additionalDetails, bqcData.noteTo, commercialEvaluationMethodJson
+              bqcData.hasAmc ? 1 : 0, bqcData.correctionFactor,               bqcData.omValue || 0,
+              bqcData.omPeriod || '', bqcData.hasOm ? 1 : 0, bqcData.additionalDetails, bqcData.noteTo, commercialEvaluationMethodJson,
+              bqcData.hasExperienceExplanatoryNote ? 1 : 0, bqcData.experienceExplanatoryNote || '',
+              bqcData.hasAdditionalExplanatoryNote ? 1 : 0, bqcData.additionalExplanatoryNote || '',
+              bqcData.hasFinancialExplanatoryNote ? 1 : 0, bqcData.financialExplanatoryNote || '',
+              bqcData.hasEMDExplanatoryNote ? 1 : 0, bqcData.emdExplanatoryNote || '',
+              bqcData.hasPastPerformanceExplanatoryNote ? 1 : 0, bqcData.pastPerformanceExplanatoryNote || '',
+              bqcData.pastPerformanceMseRelaxation ? 1 : 0
             ], function(err) {
               if (err) {
                 reject(err);
@@ -333,6 +445,429 @@ class Database {
           }
         }
       );
+    });
+  }
+
+  // Admin statistics methods
+  async getBQCStats(filters: {
+    startDate?: string;
+    endDate?: string;
+    groupName?: string;
+  } = {}): Promise<any> {
+    return new Promise((resolve, reject) => {
+      let query = `
+        SELECT 
+          COUNT(*) as totalBQCs,
+          COUNT(DISTINCT user_id) as totalUsers,
+          SUM(cec_estimate_incl_gst) as totalValue,
+          AVG(cec_estimate_incl_gst) as avgValue,
+          COUNT(CASE WHEN tender_type = 'Goods' THEN 1 END) as goodsCount,
+          COUNT(CASE WHEN tender_type = 'Service' THEN 1 END) as serviceCount,
+          COUNT(CASE WHEN tender_type = 'Works' THEN 1 END) as worksCount,
+          COUNT(CASE WHEN evaluation_methodology = 'least cash outflow' THEN 1 END) as leastCashOutflowCount,
+          COUNT(CASE WHEN evaluation_methodology = 'Lot-wise' THEN 1 END) as lotWiseCount
+        FROM bqc_data
+        WHERE 1=1
+      `;
+      
+      const params: any[] = [];
+      
+      if (filters.startDate) {
+        query += ' AND DATE(created_at) >= ?';
+        params.push(filters.startDate);
+      }
+      
+      if (filters.endDate) {
+        query += ' AND DATE(created_at) <= ?';
+        params.push(filters.endDate);
+      }
+      
+      if (filters.groupName) {
+        query += ' AND group_name = ?';
+        params.push(filters.groupName);
+      }
+
+      this.db.get(query, params, (err, row) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(row);
+        }
+      });
+    });
+  }
+
+  async getBQCGroupStats(filters: {
+    startDate?: string;
+    endDate?: string;
+    groupName?: string;
+  } = {}): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      let query = `
+        SELECT 
+          group_name,
+          COUNT(*) as count,
+          SUM(cec_estimate_incl_gst) as totalValue,
+          AVG(cec_estimate_incl_gst) as avgValue,
+          COUNT(CASE WHEN tender_type = 'Goods' THEN 1 END) as goodsCount,
+          COUNT(CASE WHEN tender_type = 'Service' THEN 1 END) as serviceCount,
+          COUNT(CASE WHEN tender_type = 'Works' THEN 1 END) as worksCount
+        FROM bqc_data
+        WHERE 1=1
+      `;
+      
+      const params: any[] = [];
+      
+      if (filters.startDate) {
+        query += ' AND DATE(created_at) >= ?';
+        params.push(filters.startDate);
+      }
+      
+      if (filters.endDate) {
+        query += ' AND DATE(created_at) <= ?';
+        params.push(filters.endDate);
+      }
+      
+      if (filters.groupName) {
+        query += ' AND group_name = ?';
+        params.push(filters.groupName);
+      }
+      
+      query += ' GROUP BY group_name ORDER BY count DESC';
+
+      this.db.all(query, params, (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows || []);
+        }
+      });
+    });
+  }
+
+  async getBQCDateRangeStats(filters: {
+    startDate?: string;
+    endDate?: string;
+    groupBy: 'day' | 'week' | 'month';
+  }): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      let dateFormat: string;
+      switch (filters.groupBy) {
+        case 'day':
+          dateFormat = '%Y-%m-%d';
+          break;
+        case 'week':
+          dateFormat = '%Y-%W';
+          break;
+        case 'month':
+          dateFormat = '%Y-%m';
+          break;
+        default:
+          dateFormat = '%Y-%m-%d';
+      }
+
+      let query = `
+        SELECT 
+          strftime('${dateFormat}', created_at) as period,
+          COUNT(*) as count,
+          SUM(cec_estimate_incl_gst) as totalValue
+        FROM bqc_data
+        WHERE 1=1
+      `;
+      
+      const params: any[] = [];
+      
+      if (filters.startDate) {
+        query += ' AND DATE(created_at) >= ?';
+        params.push(filters.startDate);
+      }
+      
+      if (filters.endDate) {
+        query += ' AND DATE(created_at) <= ?';
+        params.push(filters.endDate);
+      }
+      
+      query += ` GROUP BY strftime('${dateFormat}', created_at) ORDER BY period`;
+
+      this.db.all(query, params, (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows || []);
+        }
+      });
+    });
+  }
+
+  async getBQCEntries(filters: {
+    page: number;
+    limit: number;
+    startDate?: string;
+    endDate?: string;
+    groupName?: string;
+    tenderType?: string;
+    search?: string;
+  }): Promise<{ entries: any[]; total: number; totalPages: number }> {
+    return new Promise((resolve, reject) => {
+      let whereClause = 'WHERE 1=1';
+      const params: any[] = [];
+      
+      if (filters.startDate) {
+        whereClause += ' AND DATE(b.created_at) >= ?';
+        params.push(filters.startDate);
+      }
+      
+      if (filters.endDate) {
+        whereClause += ' AND DATE(b.created_at) <= ?';
+        params.push(filters.endDate);
+      }
+      
+      if (filters.groupName) {
+        whereClause += ' AND b.group_name = ?';
+        params.push(filters.groupName);
+      }
+      
+      if (filters.tenderType) {
+        whereClause += ' AND b.tender_type = ?';
+        params.push(filters.tenderType);
+      }
+      
+      if (filters.search) {
+        whereClause += ' AND (b.ref_number LIKE ? OR b.tender_description LIKE ? OR b.subject LIKE ?)';
+        const searchTerm = `%${filters.search}%`;
+        params.push(searchTerm, searchTerm, searchTerm);
+      }
+
+      // Get total count
+      const countQuery = `
+        SELECT COUNT(*) as total
+        FROM bqc_data b
+        ${whereClause}
+      `;
+
+      this.db.get(countQuery, params, (err, countRow: any) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+
+        const total = countRow.total;
+        const totalPages = Math.ceil(total / filters.limit);
+        const offset = (filters.page - 1) * filters.limit;
+
+        // Get paginated entries
+        const entriesQuery = `
+          SELECT 
+            b.id,
+            b.ref_number,
+            b.group_name,
+            b.subject,
+            b.tender_description,
+            b.tender_type,
+            b.cec_estimate_incl_gst,
+            b.created_at,
+            u.username,
+            u.full_name
+          FROM bqc_data b
+          LEFT JOIN users u ON b.user_id = u.id
+          ${whereClause}
+          ORDER BY b.created_at DESC
+          LIMIT ? OFFSET ?
+        `;
+
+        this.db.all(entriesQuery, [...params, filters.limit, offset], (err, rows) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({
+              entries: rows || [],
+              total,
+              totalPages
+            });
+          }
+        });
+      });
+    });
+  }
+
+  async getUserStats(): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const query = `
+        SELECT 
+          COUNT(*) as totalUsers,
+          COUNT(CASE WHEN DATE(created_at) >= DATE('now', '-30 days') THEN 1 END) as newUsersLast30Days,
+          COUNT(CASE WHEN DATE(created_at) >= DATE('now', '-7 days') THEN 1 END) as newUsersLast7Days
+        FROM users
+      `;
+
+      this.db.get(query, (err, row) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(row);
+        }
+      });
+    });
+  }
+
+  async getTenderTypeStats(filters: {
+    startDate?: string;
+    endDate?: string;
+    groupName?: string;
+  } = {}): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      let query = `
+        SELECT 
+          tender_type,
+          COUNT(*) as count,
+          SUM(cec_estimate_incl_gst) as totalValue,
+          AVG(cec_estimate_incl_gst) as avgValue
+        FROM bqc_data
+        WHERE 1=1
+      `;
+      
+      const params: any[] = [];
+      
+      if (filters.startDate) {
+        query += ' AND DATE(created_at) >= ?';
+        params.push(filters.startDate);
+      }
+      
+      if (filters.endDate) {
+        query += ' AND DATE(created_at) <= ?';
+        params.push(filters.endDate);
+      }
+      
+      if (filters.groupName) {
+        query += ' AND group_name = ?';
+        params.push(filters.groupName);
+      }
+      
+      query += ' GROUP BY tender_type ORDER BY count DESC';
+
+      this.db.all(query, params, (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows || []);
+        }
+      });
+    });
+  }
+
+  async getFinancialStats(filters: {
+    startDate?: string;
+    endDate?: string;
+    groupName?: string;
+  } = {}): Promise<any> {
+    return new Promise((resolve, reject) => {
+      let query = `
+        SELECT 
+          SUM(cec_estimate_incl_gst) as totalValue,
+          AVG(cec_estimate_incl_gst) as avgValue,
+          MIN(cec_estimate_incl_gst) as minValue,
+          MAX(cec_estimate_incl_gst) as maxValue,
+          COUNT(CASE WHEN cec_estimate_incl_gst < 100000 THEN 1 END) as under1Lakh,
+          COUNT(CASE WHEN cec_estimate_incl_gst >= 100000 AND cec_estimate_incl_gst < 1000000 THEN 1 END) as between1LakhAnd10Lakh,
+          COUNT(CASE WHEN cec_estimate_incl_gst >= 1000000 AND cec_estimate_incl_gst < 10000000 THEN 1 END) as between10LakhAnd1Crore,
+          COUNT(CASE WHEN cec_estimate_incl_gst >= 10000000 THEN 1 END) as above1Crore
+        FROM bqc_data
+        WHERE 1=1
+      `;
+      
+      const params: any[] = [];
+      
+      if (filters.startDate) {
+        query += ' AND DATE(created_at) >= ?';
+        params.push(filters.startDate);
+      }
+      
+      if (filters.endDate) {
+        query += ' AND DATE(created_at) <= ?';
+        params.push(filters.endDate);
+      }
+      
+      if (filters.groupName) {
+        query += ' AND group_name = ?';
+        params.push(filters.groupName);
+      }
+
+      this.db.get(query, params, (err, row) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(row);
+        }
+      });
+    });
+  }
+
+  async exportBQCData(filters: {
+    startDate?: string;
+    endDate?: string;
+    groupName?: string;
+    format: 'csv' | 'excel';
+  }): Promise<string> {
+    return new Promise((resolve, reject) => {
+      let query = `
+        SELECT 
+          b.id,
+          b.ref_number,
+          b.group_name,
+          b.subject,
+          b.tender_description,
+          b.tender_type,
+          b.evaluation_methodology,
+          b.cec_estimate_incl_gst,
+          b.cec_estimate_excl_gst,
+          b.created_at,
+          u.username,
+          u.full_name
+        FROM bqc_data b
+        LEFT JOIN users u ON b.user_id = u.id
+        WHERE 1=1
+      `;
+      
+      const params: any[] = [];
+      
+      if (filters.startDate) {
+        query += ' AND DATE(b.created_at) >= ?';
+        params.push(filters.startDate);
+      }
+      
+      if (filters.endDate) {
+        query += ' AND DATE(b.created_at) <= ?';
+        params.push(filters.endDate);
+      }
+      
+      if (filters.groupName) {
+        query += ' AND b.group_name = ?';
+        params.push(filters.groupName);
+      }
+      
+      query += ' ORDER BY b.created_at DESC';
+
+      this.db.all(query, params, (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          if (filters.format === 'csv') {
+            // Convert to CSV
+            const csvHeader = 'ID,Ref Number,Group,Subject,Tender Description,Tender Type,Evaluation Methodology,CEC (Incl GST),CEC (Excl GST),Created At,Username,Full Name\n';
+            const csvRows = (rows || []).map(row => 
+              `${row.id},"${row.ref_number}","${row.group_name}","${row.subject}","${row.tender_description}","${row.tender_type}","${row.evaluation_methodology}",${row.cec_estimate_incl_gst},${row.cec_estimate_excl_gst},"${row.created_at}","${row.username}","${row.full_name}"`
+            ).join('\n');
+            resolve(csvHeader + csvRows);
+          } else {
+            // For Excel, we'll return CSV for now (you can implement proper Excel export later)
+            const csvHeader = 'ID,Ref Number,Group,Subject,Tender Description,Tender Type,Evaluation Methodology,CEC (Incl GST),CEC (Excl GST),Created At,Username,Full Name\n';
+            const csvRows = (rows || []).map(row => 
+              `${row.id},"${row.ref_number}","${row.group_name}","${row.subject}","${row.tender_description}","${row.tender_type}","${row.evaluation_methodology}",${row.cec_estimate_incl_gst},${row.cec_estimate_excl_gst},"${row.created_at}","${row.username}","${row.full_name}"`
+            ).join('\n');
+            resolve(csvHeader + csvRows);
+          }
+        }
+      });
     });
   }
 

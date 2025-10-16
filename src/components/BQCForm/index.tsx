@@ -106,8 +106,8 @@ export function BQCForm() {
   const handleSave = async () => {
     const result = await saveBQCData();
     if (result.success) {
-      setSuccessMessage('Data saved successfully!');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      setSuccessMessage(result.message || 'Data saved successfully!');
+      setTimeout(() => setSuccessMessage(null), 5000);
     }
   };
 

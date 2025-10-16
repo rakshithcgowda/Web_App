@@ -5,9 +5,10 @@ import { PlusIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 interface LotWiseTableProps {
   lots: LotData[];
   onLotsChange: (lots: LotData[]) => void;
+  tenderType?: 'Goods' | 'Service' | 'Works';
 }
 
-export function LotWiseTable({ lots, onLotsChange }: LotWiseTableProps) {
+export function LotWiseTable({ lots, onLotsChange, tenderType = 'Goods' }: LotWiseTableProps) {
   const [editingLot, setEditingLot] = useState<string | null>(null);
 
   const addNewLot = () => {
@@ -86,9 +87,27 @@ export function LotWiseTable({ lots, onLotsChange }: LotWiseTableProps) {
   };
 
   const getTurnoverRequirement = (lot: LotData) => {
-    // 30% of (CEC including GST - AMC)
-    const baseAmount = lot.cecEstimateInclGst - (lot.hasAmc ? lot.amcValue : 0);
+    // 30% of (CEC including GST - AMC) - only subtract AMC if value > 0
+    const baseAmount = lot.cecEstimateInclGst - (lot.hasAmc && lot.amcValue && lot.amcValue > 0 ? lot.amcValue : 0);
     return baseAmount * 0.3;
+  };
+
+  const getExperienceRequirements = (lot: LotData) => {
+    // Experience requirements calculation for Service/Works
+    const baseAmount = lot.cecEstimateInclGst || 0;
+    
+    // Apply annualization if contract period > 12 months
+    const contractYears = (lot.contractPeriodMonths || 12) / 12;
+    const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+    
+    // Apply MSE relaxation if enabled
+    const finalAmount = lot.mseRelaxation ? annualizedAmount * 0.85 : annualizedAmount;
+    
+    return {
+      optionA: finalAmount * 0.4, // 40%
+      optionB: finalAmount * 0.5, // 50%
+      optionC: finalAmount * 0.8  // 80%
+    };
   };
 
 
@@ -134,7 +153,7 @@ export function LotWiseTable({ lots, onLotsChange }: LotWiseTableProps) {
         <div className="space-y-4">
           {/* Table Header */}
           <div className="bg-white/80 rounded-lg border border-blue-200 overflow-hidden">
-            <div className="grid grid-cols-14 gap-2 p-4 bg-gradient-to-r from-blue-100 to-indigo-100 font-semibold text-blue-900 text-xs">
+            <div className={`grid gap-2 p-4 bg-gradient-to-r from-blue-100 to-indigo-100 font-semibold text-blue-900 text-xs ${tenderType === 'Goods' ? 'grid-cols-14' : tenderType === 'Service' || tenderType === 'Works' ? 'grid-cols-15' : 'grid-cols-12'}`}>
               <div className="col-span-1">Lot</div>
               <div className="col-span-2">Description</div>
               <div className="col-span-1">CEC (Incl.)</div>
@@ -142,8 +161,15 @@ export function LotWiseTable({ lots, onLotsChange }: LotWiseTableProps) {
               <div className="col-span-1">Months</div>
               <div className="col-span-1">AMC</div>
               <div className="col-span-1">MSE</div>
-              <div className="col-span-1">Past Perf.</div>
-              <div className="col-span-1">Qty. Supplied</div>
+              {tenderType === 'Goods' && (
+                <>
+                  <div className="col-span-1">Past Perf.</div>
+                  <div className="col-span-1">Qty. Supplied</div>
+                </>
+              )}
+              {(tenderType === 'Service' || tenderType === 'Works') && (
+                <div className="col-span-1">Exp. Req.</div>
+              )}
               <div className="col-span-1">EMD</div>
               <div className="col-span-1">Turnover</div>
               <div className="col-span-2">Actions</div>
@@ -151,7 +177,7 @@ export function LotWiseTable({ lots, onLotsChange }: LotWiseTableProps) {
 
             {/* Table Rows */}
             {lots.map((lot) => (
-              <div key={lot.id} className="grid grid-cols-14 gap-2 p-3 border-t border-blue-100 hover:bg-blue-50/50 transition-colors duration-200">
+              <div key={lot.id} className={`grid gap-2 p-3 border-t border-blue-100 hover:bg-blue-50/50 transition-colors duration-200 ${tenderType === 'Goods' ? 'grid-cols-14' : tenderType === 'Service' || tenderType === 'Works' ? 'grid-cols-15' : 'grid-cols-12'}`}>
                 {/* Lot Number */}
                 <div className="col-span-1">
                   {editingLot === lot.id ? (
@@ -294,32 +320,50 @@ export function LotWiseTable({ lots, onLotsChange }: LotWiseTableProps) {
                   </div>
                 </div>
 
-                {/* Past Performance */}
-                <div className="col-span-1">
-                  <div className="text-xs font-semibold text-blue-900 bg-blue-100 rounded px-1 py-1 text-center">
-                    {getPastPerformance(lot).toLocaleString()} Units
-                  </div>
-                  {lot.mseRelaxation && (
-                    <div className="text-xs text-green-600 font-medium text-center mt-0.5">
-                      MSE -15%
+                {/* Past Performance - Only for Goods */}
+                {tenderType === 'Goods' && (
+                  <div className="col-span-1">
+                    <div className="text-xs font-semibold text-blue-900 bg-blue-100 rounded px-1 py-1 text-center">
+                      {getPastPerformance(lot).toLocaleString()} Units
                     </div>
-                  )}
-                </div>
+                    {lot.mseRelaxation && (
+                      <div className="text-xs text-green-600 font-medium text-center mt-0.5">
+                        MSE -15%
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                {/* Quantity Supplied */}
-                <div className="col-span-1">
-                  <input
-                    type="number"
-                    value={lot.quantitySupplied || ''}
-                    onChange={(e) => updateLot(lot.id, { quantitySupplied: parseInt(e.target.value) || 0 })}
-                    placeholder="0"
-                    step="1"
-                    min="0"
-                    className="form-input text-xs h-7 w-full border-blue-200 focus:border-blue-500"
-                    aria-label={`Quantity supplied for ${lot.lotNumber}`}
-                    title={`Quantity supplied for ${lot.lotNumber}`}
-                  />
-                </div>
+                {/* Experience Requirements - Only for Service/Works */}
+                {(tenderType === 'Service' || tenderType === 'Works') && (
+                  <div className="col-span-1">
+                    <div className="text-xs font-semibold text-indigo-900 bg-indigo-100 rounded px-1 py-1 text-center">
+                      ₹{getExperienceRequirements(lot).optionA.toFixed(1)}Cr
+                    </div>
+                    {lot.mseRelaxation && (
+                      <div className="text-xs text-green-600 font-medium text-center mt-0.5">
+                        MSE -15%
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Quantity Supplied - Only for Goods */}
+                {tenderType === 'Goods' && (
+                  <div className="col-span-1">
+                    <input
+                      type="number"
+                      value={lot.quantitySupplied || ''}
+                      onChange={(e) => updateLot(lot.id, { quantitySupplied: parseInt(e.target.value) || 0 })}
+                      placeholder="0"
+                      step="1"
+                      min="0"
+                      className="form-input text-xs h-7 w-full border-blue-200 focus:border-blue-500"
+                      aria-label={`Quantity supplied for ${lot.lotNumber}`}
+                      title={`Quantity supplied for ${lot.lotNumber}`}
+                    />
+                  </div>
+                )}
 
                 {/* EMD */}
                 <div className="col-span-1">
@@ -356,24 +400,31 @@ export function LotWiseTable({ lots, onLotsChange }: LotWiseTableProps) {
             ))}
 
             {/* Summary Row */}
-            <div className="grid grid-cols-14 gap-2 p-3 bg-gradient-to-r from-blue-100 to-indigo-100 border-t-2 border-blue-300 font-bold text-blue-900 text-xs">
-              <div className="col-span-3">TOTACrS</div>
+            <div className={`grid gap-2 p-3 bg-gradient-to-r from-blue-100 to-indigo-100 border-t-2 border-blue-300 font-bold text-blue-900 text-xs ${tenderType === 'Goods' ? 'grid-cols-14' : tenderType === 'Service' || tenderType === 'Works' ? 'grid-cols-15' : 'grid-cols-12'}`}>
+              <div className="col-span-3">TOTALS</div>
               <div className="col-span-1">₹{getTotalCECInclGst().toFixed(1)}Cr</div>
               <div className="col-span-1">₹{getTotalCECExclGst().toFixed(1)}Cr</div>
               <div className="col-span-1">-</div>
               <div className="col-span-1">-</div>
               <div className="col-span-1">-</div>
-              <div className="col-span-1">₹{getTotalPastPerformance().toFixed(1)}Cr</div>
-              <div className="col-span-1">₹{lots.reduce((total, lot) => total + (lot.quantitySupplied || 0), 0).toFixed(1)}Cr</div>
-              <div className="col-span-1">-</div>
-              <div className="col-span-1">-</div>
+              {tenderType === 'Goods' && (
+                <>
+                  <div className="col-span-1">₹{getTotalPastPerformance().toFixed(1)}Cr</div>
+                  <div className="col-span-1">₹{lots.reduce((total, lot) => total + (lot.quantitySupplied || 0), 0).toFixed(1)}Cr</div>
+                </>
+              )}
+              {(tenderType === 'Service' || tenderType === 'Works') && (
+                <div className="col-span-1">₹{lots.reduce((total, lot) => total + getExperienceRequirements(lot).optionA, 0).toFixed(1)}Cr</div>
+              )}
+              <div className="col-span-1">₹{lots.reduce((total, lot) => total + getEMDAmount(lot), 0).toFixed(1)}L</div>
+              <div className="col-span-1">₹{lots.reduce((total, lot) => total + getTurnoverRequirement(lot), 0).toFixed(1)}Cr</div>
               <div className="col-span-2">-</div>
             </div>
           </div>
 
-          {/* GST Summary */}
+          {/* Pointwise Calculations Summary */}
           <div className="bg-white/60 rounded-lg border border-blue-100 p-4">
-            <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
               <div>
                 <p className="text-sm text-blue-600 font-medium">Total GST Amount</p>
                 <p className="text-lg font-bold text-blue-900">
@@ -385,12 +436,63 @@ export function LotWiseTable({ lots, onLotsChange }: LotWiseTableProps) {
                 <p className="text-lg font-bold text-blue-900">{lots.length}</p>
               </div>
               <div>
-                <p className="text-sm text-blue-600 font-medium">Avg. Contract Period</p>
+                <p className="text-sm text-blue-600 font-medium">Total EMD</p>
                 <p className="text-lg font-bold text-blue-900">
-                  {lots.length > 0 ? (lots.reduce((sum, lot) => sum + (lot.contractPeriodMonths || 0), 0) / lots.length).toFixed(1) : 0} months
+                  ₹{lots.reduce((total, lot) => total + getEMDAmount(lot), 0).toFixed(1)}L
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-blue-600 font-medium">Total Turnover Req.</p>
+                <p className="text-lg font-bold text-blue-900">
+                  ₹{lots.reduce((total, lot) => total + getTurnoverRequirement(lot), 0).toFixed(1)}Cr
                 </p>
               </div>
             </div>
+            
+            {/* Additional pointwise calculations based on tender type */}
+            {tenderType === 'Goods' && (
+              <div className="mt-4 pt-4 border-t border-blue-200">
+                <div className="grid grid-cols-2 gap-4 text-center">
+                  <div>
+                    <p className="text-sm text-blue-600 font-medium">Total Past Performance</p>
+                    <p className="text-lg font-bold text-blue-900">
+                      ₹{getTotalPastPerformance().toFixed(1)}Cr
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-600 font-medium">Total Quantity Supplied</p>
+                    <p className="text-lg font-bold text-blue-900">
+                      ₹{lots.reduce((total, lot) => total + (lot.quantitySupplied || 0), 0).toFixed(1)}Cr
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {(tenderType === 'Service' || tenderType === 'Works') && (
+              <div className="mt-4 pt-4 border-t border-blue-200">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <p className="text-sm text-blue-600 font-medium">Total Exp. Req. (40%)</p>
+                    <p className="text-lg font-bold text-blue-900">
+                      ₹{lots.reduce((total, lot) => total + getExperienceRequirements(lot).optionA, 0).toFixed(1)}Cr
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-600 font-medium">Total Exp. Req. (50%)</p>
+                    <p className="text-lg font-bold text-blue-900">
+                      ₹{lots.reduce((total, lot) => total + getExperienceRequirements(lot).optionB, 0).toFixed(1)}Cr
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-600 font-medium">Total Exp. Req. (80%)</p>
+                    <p className="text-lg font-bold text-blue-900">
+                      ₹{lots.reduce((total, lot) => total + getExperienceRequirements(lot).optionC, 0).toFixed(1)}Cr
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

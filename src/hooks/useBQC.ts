@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import type { BQCData, SavedBQCEntry, DocumentGenerationRequest } from '@/types';
 import { bqcService } from '@/services/bqc';
 import { DEFAULT_BQC_DATA } from '@/utils/constants';
-import { validateBQCData } from '@/utils/validation';
+import { validateBQCData, fillEmptyFieldsWithDefaults, getFieldsFilledWithDefaults } from '@/utils/validation';
 import { 
   calculateAnnualizedValue, 
   calculateTurnoverRequirement,
@@ -22,9 +22,9 @@ export function useBQC() {
     setBQCData(prevData => {
       const newData = { ...prevData, ...updates };
       
-      // Ensure evaluation methodology defaults to LCS if not set
+      // Ensure evaluation methodology defaults to least cash outflow if not set
       if (!newData.evaluationMethodology) {
-        newData.evaluationMethodology = 'LCS';
+        newData.evaluationMethodology = 'least cash outflow';
       }
       
       // Handle methodology transition
@@ -32,15 +32,15 @@ export function useBQC() {
         const newMethodology = updates.evaluationMethodology;
         const oldMethodology = prevData.evaluationMethodology;
         
-        // If switching from LCS to Lot-wise, clear main CEC values and ensure lots array exists
-        if (oldMethodology === 'LCS' && newMethodology === 'Lot-wise') {
+        // If switching from least cash outflow to Lot-wise, clear main CEC values and ensure lots array exists
+        if (oldMethodology === 'least cash outflow' && newMethodology === 'Lot-wise') {
           newData.cecEstimateInclGst = 0;
           newData.cecEstimateExclGst = 0;
           newData.lots = newData.lots || [];
         }
         
-        // If switching from Lot-wise to LCS, clear lots array and ensure CEC values are set
-        if (oldMethodology === 'Lot-wise' && newMethodology === 'LCS') {
+        // If switching from Lot-wise to least cash outflow, clear lots array and ensure CEC values are set
+        if (oldMethodology === 'Lot-wise' && newMethodology === 'least cash outflow') {
           newData.lots = [];
           // Keep existing CEC values or set defaults
           if (newData.cecEstimateInclGst === 0 && newData.cecEstimateExclGst === 0) {
@@ -106,7 +106,11 @@ export function useBQC() {
 
   // Save BQC data
   const saveBQCData = useCallback(async () => {
-    const validation = validateBQCData(bqcData);
+    // Fill empty fields with default values before validation
+    const filledData = fillEmptyFieldsWithDefaults(bqcData);
+    const fieldsFilledWithDefaults = getFieldsFilledWithDefaults(bqcData, filledData);
+    
+    const validation = validateBQCData(filledData);
     if (!validation.isValid) {
       setError(`Validation failed: ${validation.errors.map(e => e.message).join(', ')}`);
       return { success: false, errors: validation.errors };
@@ -116,11 +120,19 @@ export function useBQC() {
     setError(null);
 
     try {
-      const response = await bqcService.saveBQCData(bqcData);
+      const response = await bqcService.saveBQCData(filledData);
       if (response.success) {
+        // Update the local state with the filled data
+        setBQCData(filledData);
         // Refresh saved entries list
         await loadSavedEntries();
-        return { success: true };
+        return { 
+          success: true, 
+          fieldsFilledWithDefaults,
+          message: fieldsFilledWithDefaults.length > 0 
+            ? `Data saved successfully! ${fieldsFilledWithDefaults.length} empty field(s) filled with default values.`
+            : 'Data saved successfully!'
+        };
       } else {
         setError(response.message || 'Failed to save data');
         return { success: false, message: response.message };

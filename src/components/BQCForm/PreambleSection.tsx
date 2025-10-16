@@ -140,7 +140,7 @@ export function PreambleSection({ data, onChange }: PreambleSectionProps) {
             <select
               id="evaluationMethodology"
               className="form-input border-purple-200 focus:border-purple-500 focus:ring-purple-200"
-              value={data.evaluationMethodology || 'LCS'}
+              value={data.evaluationMethodology || 'least cash outflow'}
               onChange={(e) => {
                 const selectedMethod = e.target.value as BQCData['evaluationMethodology'];
                 onChange({ evaluationMethodology: selectedMethod });
@@ -153,7 +153,7 @@ export function PreambleSection({ data, onChange }: PreambleSectionProps) {
               ))}
             </select>
             <p className="mt-1 text-sm text-purple-600">
-              {(data.evaluationMethodology || 'LCS') === 'LCS' 
+              {(data.evaluationMethodology || 'least cash outflow') === 'least cash outflow' 
                 ? 'Single CEC estimate for entire tender'
                 : 'Separate CEC estimates for individual lots'
               }
@@ -162,11 +162,11 @@ export function PreambleSection({ data, onChange }: PreambleSectionProps) {
         </div>
 
         {/* CEC Estimates - Conditional Rendering */}
-        {data.evaluationMethodology === 'LCS' ? (
-          /* LCS - Single CEC Estimates */
+        {data.evaluationMethodology === 'least cash outflow' ? (
+          /* least cash outflow - Single CEC Estimates */
           <div className="bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 rounded-xl p-6">
             <div className="flex items-center space-x-2 mb-4">
-              <h4 className="text-md font-semibold text-emerald-900">CEC Estimates (LCS)</h4>
+              <h4 className="text-md font-semibold text-emerald-900">CEC Estimates (least cash outflow)</h4>
               <Tooltip content="Contract Estimate Committee approved estimates for entire tender" position="right" />
             </div>
             
@@ -231,6 +231,7 @@ export function PreambleSection({ data, onChange }: PreambleSectionProps) {
           <LotWiseTable 
             lots={data.lots || []}
             onLotsChange={(lots) => onChange({ lots })}
+            tenderType={data.tenderType}
           />
         )}
 

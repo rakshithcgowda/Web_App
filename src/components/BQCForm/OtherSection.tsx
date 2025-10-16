@@ -2,6 +2,7 @@
 import type { BQCData } from '@/types';
 import { DIVISIBILITY_OPTIONS } from '@/utils/constants';
 import { formatCurrency } from '@/utils/calculations';
+import { ExplanatoryNote } from '../ExplanatoryNote';
 
 interface OtherSectionProps {
   data: BQCData;
@@ -58,6 +59,16 @@ export function OtherSection({ data, onChange, calculatedValues }: OtherSectionP
           />
         </div>
 
+        {/* Explanatory Note for Additional Details */}
+        <ExplanatoryNote
+          label="Additional Details"
+          checked={data.hasAdditionalExplanatoryNote || false}
+          onCheckedChange={(checked) => onChange({ hasAdditionalExplanatoryNote: checked })}
+          value={data.additionalExplanatoryNote || ''}
+          onValueChange={(value) => onChange({ additionalExplanatoryNote: value })}
+          placeholder="Add any additional information about terms and conditions..."
+        />
+
         {/* Divisibility */}
         <div className="form-group">
           <label htmlFor="divisibility" className="form-label text-lg">
@@ -105,8 +116,8 @@ export function OtherSection({ data, onChange, calculatedValues }: OtherSectionP
         <div>
           <label className="form-label">EMD Preview</label>
           
-          {data.evaluationMethodology === 'LCS' ? (
-            /* LCS - Show calculated EMD */
+          {data.evaluationMethodology === 'least cash outflow' ? (
+            /* least cash outflow - Show calculated EMD */
             <div className="bg-yellow-50 p-4 rounded-lg">
               <p className="text-lg font-semibold text-yellow-900">
                 EMD: {calculatedValues.emdAmount === 0 ? 'Nil' : formatCurrency(calculatedValues.emdAmount, 'Lacs')}
@@ -131,6 +142,16 @@ export function OtherSection({ data, onChange, calculatedValues }: OtherSectionP
           )}
         </div>
 
+        {/* Explanatory Note for EMD */}
+        <ExplanatoryNote
+          label="EMD"
+          checked={data.hasEMDExplanatoryNote || false}
+          onCheckedChange={(checked) => onChange({ hasEMDExplanatoryNote: checked })}
+          value={data.emdExplanatoryNote || ''}
+          onValueChange={(value) => onChange({ emdExplanatoryNote: value })}
+          placeholder="Add any additional information about EMD requirements..."
+        />
+
         {/* Performance Security */}
         <div>
           <div className="flex items-center space-x-3 mb-3">
@@ -142,47 +163,21 @@ export function OtherSection({ data, onChange, calculatedValues }: OtherSectionP
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
               <span className="text-sm font-medium text-gray-900">
-                Performance Security (Optional)
+                Performance Security (any variance from ITB)
               </span>
             </label>
           </div>
           
           {data.hasPerformanceSecurity && (
             <div className="space-y-3">
-              <div className="relative">
-                <input
-                  type="number"
-                  id="performanceSecurity"
-                  className={`form-input pr-8 ${
-                    data.performanceSecurity && ![5, 10].includes(data.performanceSecurity)
-                      ? 'border-amber-300 bg-amber-50 focus:border-amber-500 focus:ring-amber-200'
-                      : ''
-                  }`}
-                  placeholder="5"
-                  min="0"
-                  max="20"
-                  value={data.performanceSecurity || ''}
-                  onChange={(e) => onChange({ performanceSecurity: parseInt(e.target.value) || 5 })}
-                />
-                <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm text-gray-500">
-                  %
-                </span>
-              </div>
-              <p className="text-sm text-gray-500">
-                Standard: 5% for Goods & Services, 10% for Works
-              </p>
-              {data.performanceSecurity && ![5, 10].includes(data.performanceSecurity) && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <div className="flex items-center space-x-2">
-                    <svg className="h-4 w-4 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                    <p className="text-sm text-amber-800 font-medium">
-                      ⚠️ Non-standard performance security percentage. Standard values are 5% (Goods & Services) or 10% (Works).
-                    </p>
-                  </div>
-                </div>
-              )}
+              <textarea
+                id="performanceSecurity"
+                rows={4}
+                className="form-input text-base"
+                placeholder="Enter performance security details (any variance from ITB)"
+                value={data.performanceSecurity || ''}
+                onChange={(e) => onChange({ performanceSecurity: e.target.value })}
+              />
             </div>
           )}
         </div>

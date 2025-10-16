@@ -103,13 +103,15 @@ export function calculateLotWiseTotals(data: BQCData): {
   totalCECExclGst: number;
   totalPastPerformance: number;
 } {
-  if (data.evaluationMethodology === 'LCS') {
-    // For LCS, only use quantitySupplied if it's provided, otherwise return 0
+  if (data.evaluationMethodology === 'least cash outflow') {
+    // For least cash outflow, only use quantitySupplied if it's provided, otherwise return 0
     const quantitySupplied = data.quantitySupplied || 0;
+    // Always return Non-MSE (standard) value for the main calculation
+    // MSE value will be calculated separately in the UI
     return {
       totalCECInclGst: data.cecEstimateInclGst,
       totalCECExclGst: data.cecEstimateExclGst,
-      totalPastPerformance: calculatePastPerformance(quantitySupplied, data.mseRelaxation)
+      totalPastPerformance: calculatePastPerformance(quantitySupplied, false)
     };
   }
 
@@ -142,17 +144,17 @@ export function calculateTurnoverRequirement(data: BQCData): {
     basePercentage = 0.3 * (1 + data.correctionFactor);
   }
 
-  // Get total CEC values (handles both LCS and lot-wise)
+  // Get total CEC values (handles both least cash outflow and lot-wise)
   const totals = calculateLotWiseTotals(data);
 
   // Calculate base amount: CEC including GST minus AMC
   let baseAmount = totals.totalCECInclGst;
   
-  // Subtract AMC if applicable
-  if (data.evaluationMethodology === 'LCS' && data.hasAmc && data.amcValue) {
+  // Subtract AMC if applicable (only if value > 0)
+  if (data.evaluationMethodology === 'least cash outflow' && data.hasAmc && data.amcValue && data.amcValue > 0) {
     baseAmount -= data.amcValue;
   } else if (data.evaluationMethodology === 'Lot-wise' && data.lots) {
-    const totalAMC = data.lots.reduce((sum, lot) => sum + (lot.hasAmc ? lot.amcValue : 0), 0);
+    const totalAMC = data.lots.reduce((sum, lot) => sum + (lot.hasAmc && lot.amcValue && lot.amcValue > 0 ? lot.amcValue : 0), 0);
     baseAmount -= totalAMC;
   }
 
@@ -167,7 +169,7 @@ export function calculateTurnoverRequirement(data: BQCData): {
     annualizedAmount = turnoverAmount / contractDurationYears;
   }
   
-  const description = `${basePercentage * 100}% of (CEC including GST${data.hasAmc || (data.lots && data.lots.some(lot => lot.hasAmc)) ? ' - AMC' : ''})`;
+  const description = `${basePercentage * 100}% of (CEC including GST${(data.hasAmc && data.amcValue && data.amcValue > 0) || (data.lots && data.lots.some(lot => lot.hasAmc && lot.amcValue && lot.amcValue > 0)) ? ' - AMC' : ''})`;
 
   return {
     amount: annualizedAmount,
@@ -197,7 +199,7 @@ export function calculateExperienceRequirements(data: BQCData): {
     optionCPercent = 0.8 * (1 + correctionFactor);
   }
 
-  // Get total CEC values (handles both LCS and lot-wise)
+  // Get total CEC values (handles both least cash outflow and lot-wise)
   const totals = calculateLotWiseTotals(data);
 
   // Calculate base values
@@ -218,12 +220,12 @@ export function calculateExperienceRequirements(data: BQCData): {
     annualizedOptionC = baseOptionC / contractDurationYears;
   }
 
-  // Apply MSE relaxation for Service/Works tenders with LCS if enabled
+  // Apply MSE relaxation for Service/Works tenders with least cash outflow if enabled
   let finalOptionA = annualizedOptionA;
   let finalOptionB = annualizedOptionB;
   let finalOptionC = annualizedOptionC;
 
-  if ((data.tenderType === 'Service' || data.tenderType === 'Works') && data.evaluationMethodology === 'LCS' && data.mseRelaxation) {
+  if ((data.tenderType === 'Service' || data.tenderType === 'Works') && data.evaluationMethodology === 'least cash outflow' && data.mseRelaxation) {
     // Apply 15% relaxation for MSE
     finalOptionA = annualizedOptionA * 0.85;
     finalOptionB = annualizedOptionB * 0.85;
@@ -262,23 +264,10 @@ export function formatCurrency(amount: number, suffix: string = 'Crore'): string
 }
 
 /**
- * Format turnover amount - display in Lakhs if beyond 2 decimal places in Crores
+ * Format turnover amount - always display in Crores
  */
 export function formatTurnoverAmount(amountInCrores: number): string {
-  // If amount is less than 0.01 Crores (1 Lakh), display in Lakhs
-  if (amountInCrores < 0.01) {
-    const amountInLakhs = amountInCrores * 100;
-    return `Rs. ${amountInLakhs.toFixed(2)} Lakh`;
-  }
-  
-  // If amount has more than 2 decimal places, display in Lakhs
-  const roundedCrores = Math.round(amountInCrores * 100) / 100;
-  if (Math.abs(amountInCrores - roundedCrores) > 0.001) {
-    const amountInLakhs = amountInCrores * 100;
-    return `Rs. ${amountInLakhs.toFixed(2)} Lakh`;
-  }
-  
-  // Otherwise display in Crores
+  // Always display in Crores format
   return `Rs. ${amountInCrores.toFixed(2)} Crore`;
 }
 

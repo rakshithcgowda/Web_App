@@ -1,6 +1,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { BQCForm } from '@/components/BQCForm';
-import { ArrowRightOnRectangleIcon, UserIcon } from '@heroicons/react/24/outline';
+import { ArrowRightOnRectangleIcon, UserIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { Link } from 'react-router-dom';
 
 export function Dashboard() {
   const { user, logout } = useAuth();
@@ -39,6 +40,14 @@ export function Dashboard() {
                   <p className="text-gray-600 font-medium">{user?.fullName || user?.username}</p>
                 </div>
               </div>
+
+              <Link
+                to="/admin"
+                className="flex items-center space-x-3 px-5 py-3 text-sm font-semibold text-gray-600 hover:text-blue-600 hover:bg-blue-50/80 rounded-xl transition-all duration-300 border border-transparent hover:border-blue-200/50 hover:shadow-md backdrop-blur-sm"
+              >
+                <ChartBarIcon className="h-5 w-5" />
+                <span>Admin Dashboard</span>
+              </Link>
               
               <button
                 onClick={handleLogout}

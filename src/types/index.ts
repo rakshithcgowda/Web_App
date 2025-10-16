@@ -49,7 +49,7 @@ export interface BQCData {
   tenderDescription: string;
   prReference: string;
   tenderType: 'Goods' | 'Service' | 'Works';
-  evaluationMethodology: 'LCS' | 'Lot-wise';
+  evaluationMethodology: 'least cash outflow' | 'Lot-wise';
   cecEstimateInclGst: number;
   cecDate: string;
   cecEstimateExclGst: number;
@@ -75,7 +75,7 @@ export interface BQCData {
   annualizedValue: number;
   escalationClause: string;
   divisibility: 'Divisible' | 'Non-Divisible';
-  performanceSecurity: number;
+  performanceSecurity: string;
   hasPerformanceSecurity: boolean;
   proposedBy: string;
   proposedByDesignation: string;
@@ -92,10 +92,23 @@ export interface BQCData {
   omPeriod: string;
   hasOm: boolean;
   additionalDetails: string;
-  quantitySupplied?: number; // Added quantity supplied field for LCS methodology
+  quantitySupplied?: number; // Added quantity supplied field for least cash outflow methodology
   itemName?: string; // Added item name field
   noteTo?: string; // NOTE TO recipient selection
   commercialEvaluationMethod?: string[]; // Commercial evaluation method selection (multiple)
+  // Explanatory Notes
+  hasExperienceExplanatoryNote?: boolean;
+  experienceExplanatoryNote?: string;
+  hasAdditionalExplanatoryNote?: boolean;
+  additionalExplanatoryNote?: string;
+  hasFinancialExplanatoryNote?: boolean;
+  financialExplanatoryNote?: string;
+  hasEMDExplanatoryNote?: boolean;
+  emdExplanatoryNote?: string;
+  hasPastPerformanceExplanatoryNote?: boolean;
+  pastPerformanceExplanatoryNote?: string;
+  // MSE Relaxation for Past Performance Requirement
+  pastPerformanceMseRelaxation?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
