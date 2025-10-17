@@ -138,12 +138,12 @@ export const API_ENDPOINTS = {
     GENERATE: '/api/bqc/generate'
   },
   ADMIN: {
-    STATS_OVERVIEW: '/api/admin/stats/overview',
-    STATS_GROUPS: '/api/admin/stats/groups',
-    STATS_DATE_RANGE: '/api/admin/stats/date-range',
-    STATS_USERS: '/api/admin/stats/users',
-    STATS_TENDER_TYPES: '/api/admin/stats/tender-types',
-    STATS_FINANCIAL: '/api/admin/stats/financial',
+    STATS_OVERVIEW: '/api/admin/stats-overview',
+    STATS_GROUPS: '/api/admin/stats-groups',
+    STATS_DATE_RANGE: '/api/admin/stats-date-range',
+    STATS_USERS: '/api/admin/stats-users',
+    STATS_TENDER_TYPES: '/api/admin/stats-tender-types',
+    STATS_FINANCIAL: '/api/admin/stats-financial',
     BQC_ENTRIES: '/api/admin/bqc-entries',
     EXPORT: '/api/admin/export'
   }
