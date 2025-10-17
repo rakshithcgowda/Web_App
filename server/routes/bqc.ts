@@ -305,7 +305,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
       const turnoverAmount = basePercentage * baseAmount;
       
       // Apply annualization for all tender types if contract duration > 1 year
-      const contractDurationYears = data.contractDurationYears || 1;
+      const contractDurationYears = (data as any).contractDurationYears || 1;
       
       if (contractDurationYears > 1) {
         return turnoverAmount / contractDurationYears;
@@ -486,10 +486,10 @@ router.post('/generate', async (req: AuthRequest, res) => {
           const parts = date.split('-');
           if (parts[0].length === 4) {
             // yyyy-mm-dd format
-            dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+            dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
           } else {
             // dd-mm-yyyy format
-            dateObj = new Date(parts[2], parts[1] - 1, parts[0]);
+            dateObj = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
           }
         } else {
           dateObj = new Date(date);

@@ -7,6 +7,15 @@ import bqcRoutes from '../server/routes/bqc';
 
 const app = express();
 
+// Log environment variables for debugging (only in development)
+if (process.env.NODE_ENV !== 'production') {
+  console.log('Environment check:', {
+    NODE_ENV: process.env.NODE_ENV,
+    POSTGRES_URL: process.env.POSTGRES_URL ? 'Set' : 'Not set',
+    JWT_SECRET: process.env.JWT_SECRET ? 'Set' : 'Not set'
+  });
+}
+
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: {
@@ -23,8 +32,8 @@ app.use(helmet({
 // CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://your-vercel-app.vercel.app'] // Replace with your actual Vercel URL
-    : ['http://localhost:3000'],
+    ? true // Allow all origins in production for Vercel
+    : ['http://localhost:3000', 'http://127.0.0.1:3000'],
   credentials: true,
 }));
 
@@ -47,6 +56,27 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   });
+});
+
+// Database test endpoint
+app.get('/api/test-db', async (req, res) => {
+  try {
+    const { database } = await import('../server/models/database-adapter');
+    // Test database connection
+    await database.getUserByUsername('test');
+    res.json({ 
+      status: 'OK', 
+      message: 'Database connection successful',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Database test error:', error);
+    res.status(500).json({
+      status: 'ERROR',
+      message: 'Database connection failed',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Database error'
+    });
+  }
 });
 
 // API routes

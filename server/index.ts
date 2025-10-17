@@ -1,3 +1,8 @@
+import 'dotenv/config';
+import { config } from 'dotenv';
+
+// Load .env.local file explicitly
+config({ path: '.env.local' });
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';

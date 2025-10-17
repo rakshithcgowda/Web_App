@@ -3,7 +3,7 @@ import { API_ENDPOINTS } from '@/utils/constants';
 import { authService } from './auth';
 
 class BQCService {
-  private baseURL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? window.location.origin : 'http://localhost:3002');
+  private baseURL = import.meta.env.VITE_API_URL || window.location.origin;
 
   private async makeAuthenticatedRequest(url: string, options: RequestInit = {}): Promise<Response> {
     const token = authService.getToken();

@@ -71,19 +71,37 @@ router.post('/register', async (req, res) => {
 // Login
 router.post('/login', async (req, res) => {
   try {
+    console.log('Login attempt:', { username: req.body.username, timestamp: new Date().toISOString() });
+    
     const { username, password } = req.body;
 
     // Validate input
     if (!username || !password) {
+      console.log('Login validation failed: missing credentials');
       return res.status(400).json({
         success: false,
         message: 'Username and password are required'
       });
     }
 
+    // Test database connection first
+    try {
+      await database.getUserByUsername('test');
+    } catch (dbError) {
+      console.error('Database connection test failed:', dbError);
+      return res.status(500).json({
+        success: false,
+        message: 'Database connection failed',
+        ...(process.env.NODE_ENV === 'development' && {
+          error: dbError instanceof Error ? dbError.message : 'Database error'
+        })
+      });
+    }
+
     // Find user
     const user = await database.getUserByUsername(username);
     if (!user) {
+      console.log('Login failed: user not found:', username);
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
@@ -93,6 +111,7 @@ router.post('/login', async (req, res) => {
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
+      console.log('Login failed: invalid password for user:', username);
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
@@ -101,6 +120,7 @@ router.post('/login', async (req, res) => {
 
     // Generate token
     const token = generateToken(user.id);
+    console.log('Login successful for user:', username);
 
     res.json({
       success: true,
@@ -117,9 +137,18 @@ router.post('/login', async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+      timestamp: new Date().toISOString()
+    });
     res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: 'Internal server error',
+      ...(process.env.NODE_ENV === 'development' && {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
     });
   }
 });

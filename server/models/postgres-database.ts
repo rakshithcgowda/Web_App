@@ -2,11 +2,24 @@ import { sql } from '@vercel/postgres';
 
 class PostgresDatabase {
   constructor() {
-    this.setupDatabase();
+    // Delay database setup to ensure environment variables are loaded
+    setTimeout(() => {
+      this.setupDatabase();
+    }, 100);
   }
 
   private async setupDatabase(): Promise<void> {
     try {
+      console.log('Setting up database tables...');
+      console.log('Environment check:', {
+        POSTGRES_URL: process.env.POSTGRES_URL ? 'Set' : 'Not set',
+        NODE_ENV: process.env.NODE_ENV
+      });
+      
+      // Test database connection first
+      await sql`SELECT 1 as test`;
+      console.log('Database connection successful');
+      
       // Create users table
       await sql`
         CREATE TABLE IF NOT EXISTS users (
@@ -18,6 +31,7 @@ class PostgresDatabase {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `;
+      console.log('Users table created/verified');
 
       // Create bqc_data table
       await sql`
@@ -90,6 +104,13 @@ class PostgresDatabase {
       `;
     } catch (error) {
       console.error('Database setup error:', error);
+      console.error('Database error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : undefined
+      });
+      // Don't throw the error to prevent server startup failure
+      // The database might be available later
     }
   }
 
@@ -110,10 +131,15 @@ class PostgresDatabase {
   }
 
   async getUserByUsername(username: string): Promise<any> {
-    const result = await sql`
-      SELECT * FROM users WHERE username = ${username}
-    `;
-    return result.rows[0];
+    try {
+      const result = await sql`
+        SELECT * FROM users WHERE username = ${username}
+      `;
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error getting user by username:', error);
+      throw error;
+    }
   }
 
   async getUserById(id: number): Promise<any> {

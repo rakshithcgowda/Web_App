@@ -107,13 +107,13 @@ function createTextRun(text: string, formatting: { bold: boolean; italic: boolea
   
   // Apply formatting
   if (formatting.bold) {
-    textRun.bold = true;
+    (textRun as any).bold = true;
   }
   if (formatting.italic) {
-    textRun.italics = true;
+    (textRun as any).italics = true;
   }
   if (formatting.underline) {
-    textRun.underline = {};
+    (textRun as any).underline = {};
   }
   
   return textRun;

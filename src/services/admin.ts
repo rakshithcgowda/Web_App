@@ -74,7 +74,7 @@ export interface BQCEntriesResponse {
 }
 
 class AdminService {
-  private baseURL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? window.location.origin : 'http://localhost:3002');
+  private baseURL = import.meta.env.VITE_API_URL || window.location.origin;
 
   private async makeAuthenticatedRequest(url: string, options: RequestInit = {}): Promise<Response> {
     const token = authService.getToken();
