@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcryptjs';
-import { database } from '../../server/models/database-adapter';
+import { database } from '../../server/models/database-adapter.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers

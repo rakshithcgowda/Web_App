@@ -2,8 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import authRoutes from '../server/routes/auth';
-import bqcRoutes from '../server/routes/bqc';
+import authRoutes from '../server/routes/auth.js';
+import bqcRoutes from '../server/routes/bqc.js';
 
 const app = express();
 
@@ -61,7 +61,7 @@ app.get('/api/health', (req, res) => {
 // Database test endpoint
 app.get('/api/test-db', async (req, res) => {
   try {
-    const { database } = await import('../server/models/database-adapter');
+    const { database } = await import('../server/models/database-adapter.js');
     // Test database connection
     await database.getUserByUsername('test');
     res.json({ 

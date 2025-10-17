@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import { database } from '../models/database-adapter';
-import { generateToken, authenticateToken, AuthRequest } from '../middleware/auth';
+import { database } from '../models/database-adapter.js';
+import { generateToken, authenticateToken, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
 

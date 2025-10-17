@@ -1,8 +1,8 @@
 import express from 'express';
-import { database } from '../models/database-adapter';
-import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { database } from '../models/database-adapter.js';
+import { authenticateToken, AuthRequest } from '../middleware/auth.js';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType } from 'docx';
-import { convertHtmlToWordRuns } from '../utils/htmlToWord';
+import { convertHtmlToWordRuns } from '../utils/htmlToWord.js';
 
 const router = express.Router();
 

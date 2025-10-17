@@ -13,7 +13,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { database } = await import('../server/models/database-adapter');
+    const { database } = await import('../server/models/database-adapter.js');
     // Test database connection
     await database.getUserByUsername('test');
     res.json({ 

@@ -7,9 +7,9 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import authRoutes from './routes/auth';
-import bqcRoutes from './routes/bqc';
-import adminRoutes from './routes/admin';
+import authRoutes from './routes/auth.js';
+import bqcRoutes from './routes/bqc.js';
+import adminRoutes from './routes/admin.js';
 
 const app = express();
 const PORT = process.env.PORT || 3002;
