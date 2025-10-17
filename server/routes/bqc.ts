@@ -84,7 +84,11 @@ router.get('/load/:id', async (req: AuthRequest, res) => {
       amcPeriod: bqcData.amc_period || '',
       paymentTerms: bqcData.payment_terms || '',
       manufacturerTypes: bqcData.manufacturer_types || [],
-      supplyingCapacity: bqcData.supplying_capacity,
+      supplyingCapacity: {
+        calculated: bqcData.supplying_capacity || 0,
+        final: bqcData.supplying_capacity || 0,
+        mseAdjusted: undefined
+      },
       mseRelaxation: Boolean(bqcData.mse_relaxation),
       similarWorkDefinition: bqcData.similar_work_definition || '',
       annualizedValue: bqcData.annualized_value,
