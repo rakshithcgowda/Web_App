@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { database } from '../../server/models/database-adapter';
-import { authenticateTokenVercel } from '../../server/middleware/auth';
+import { database } from '../../server/models/database-adapter.js';
+import { authenticateTokenVercel } from '../../server/middleware/auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers

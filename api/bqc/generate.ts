@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateTokenVercel } from '../../server/middleware/auth';
+import { authenticateTokenVercel } from '../../server/middleware/auth.js';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType } from 'docx';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
