@@ -1466,8 +1466,8 @@ router.post('/generate', async (req: AuthRequest, res) => {
               spacing: { after: 200 },
             }),
             
-            // Only show Supplying Capacity section for Goods tender type
-            ...(bqcData.tenderType === 'Goods' ? [
+            // Only show Supplying Capacity section for Goods tender type with least cash outflow methodology
+            ...(bqcData.tenderType === 'Goods' && bqcData.evaluationMethodology === 'least cash outflow' ? [
               new Paragraph({
                 children: [
                   new TextRun({ 
@@ -1541,6 +1541,191 @@ router.post('/generate', async (req: AuthRequest, res) => {
               }),
             ] : []),
           ] : []),
+          ] : []),
+
+          // Lot-wise Supplying Capacity table for Goods tender type
+          ...(bqcData.tenderType === 'Goods' && bqcData.evaluationMethodology === 'Lot-wise' && bqcData.lots && bqcData.lots.length > 0 ? [
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "Supplying Capacity:",
+                  bold: true,
+                  size: 22,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "Non-MSE (Standard) Requirements:\nThe bidder should have supplied similar goods in the last Seven (7) years. The quantity supplied should be at least 30% of the total quantity required for each lot as per below table.",
+                  size: 22,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "For MSE bidders, Relaxation of 15% on the supplying capacity shall be given as per Corp. Finance Circular MA.TEC.POL.CON.3A dated 26.10.2020.",
+                  size: 22,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+
+            // Supplying Capacity table
+            new Table({
+              width: { size: 100, type: WidthType.PERCENTAGE },
+              borders: {
+                top: { style: BorderStyle.SINGLE, size: 1 },
+                bottom: { style: BorderStyle.SINGLE, size: 1 },
+                left: { style: BorderStyle.SINGLE, size: 1 },
+                right: { style: BorderStyle.SINGLE, size: 1 },
+                insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
+                insideVertical: { style: BorderStyle.SINGLE, size: 1 },
+              },
+              rows: [
+                // Header row
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "Sr. No.", bold: true, size: 20, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 10, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "Section / Description", bold: true, size: 20, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 30, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "Quantity Required", bold: true, size: 20, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 20, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "Non-MSE (30%)", bold: true, size: 20, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 20, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "MSE (15%)", bold: true, size: 20, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 20, type: WidthType.PERCENTAGE },
+                    }),
+                  ],
+                }),
+                // Data rows
+                ...bqcData.lots.map((lot: LotData, index: number) => {
+                  const quantityRequired = lot.quantitySupplied || 0;
+                  const nonMseRequirement = Math.round(quantityRequired * 0.3);
+                  const mseRequirement = Math.round(quantityRequired * 0.15); // 15% for MSE
+                  
+                  return new TableRow({
+                    children: [
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${index + 1}`, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${lot.lotNumber || `LOT-${index + 1}`}`, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.LEFT,
+                        })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${quantityRequired.toLocaleString()}`, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${nonMseRequirement.toLocaleString()}`, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${mseRequirement.toLocaleString()}`, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                    ],
+                  });
+                }),
+                // Total row
+                (() => {
+                  const totalQuantity = bqcData.lots.reduce((sum: number, lot: LotData) => sum + (lot.quantitySupplied || 0), 0);
+                  const totalNonMse = Math.round(totalQuantity * 0.3);
+                  const totalMse = Math.round(totalQuantity * 0.15);
+                  
+                  return new TableRow({
+                    children: [
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${bqcData.lots.length + 1}`, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: "TOTAL FOR ALL LOTS", bold: true, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.LEFT,
+                        })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${totalQuantity.toLocaleString()}`, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${totalNonMse.toLocaleString()}`, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${totalMse.toLocaleString()}`, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                    ],
+                  });
+                })(),
+              ],
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "Bidder can quote for any one or more than one LOT based on their capability/choice.",
+                  size: 22,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { before: 200, after: 400 },
+            }),
           ] : []),
           
           // Explanatory Note for Past Performance Requirement

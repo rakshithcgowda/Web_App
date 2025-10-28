@@ -305,7 +305,7 @@ export function LotWiseTable({
               
               {/* Table Header */}
               <div className="bg-white/80 rounded-lg border border-amber-200 overflow-hidden">
-                <div className={`grid gap-2 p-4 bg-gradient-to-r from-amber-100 to-orange-100 font-semibold text-amber-900 text-xs ${tenderType === 'Goods' ? 'grid-cols-12' : 'grid-cols-10'}`}>
+                <div className={`grid gap-2 p-4 bg-gradient-to-r from-amber-100 to-orange-100 font-semibold text-amber-900 text-xs ${tenderType === 'Goods' ? 'grid-cols-[repeat(13,minmax(0,1fr))]' : 'grid-cols-10'}`}>
                   <div className="col-span-1">Lot</div>
                   <div className="col-span-1">Description</div>
                   <div className="col-span-1">CEC (Incl.)</div>
@@ -328,7 +328,7 @@ export function LotWiseTable({
 
               {/* Table Rows */}
               {lots.map((lot) => (
-                <div key={lot.id} className={`grid gap-2 p-3 border-t border-amber-100 hover:bg-amber-50/50 transition-colors duration-200 ${tenderType === 'Goods' ? 'grid-cols-12' : 'grid-cols-10'}`}>
+                <div key={lot.id} className={`grid gap-2 p-3 border-t border-amber-100 hover:bg-amber-50/50 transition-colors duration-200 ${tenderType === 'Goods' ? 'grid-cols-[repeat(13,minmax(0,1fr))]' : 'grid-cols-10'}`}>
                   {/* Lot Number */}
                   <div className="col-span-1">
                     {editingLot === lot.id ? (
@@ -415,7 +415,7 @@ export function LotWiseTable({
                     </div>
                   </div>
 
-                  {/* Quantity Field - Only for Goods */}
+                  {/* Quantity Field - For Goods only */}
                   {tenderType === 'Goods' && (
                     <div className="col-span-1">
                       <input
@@ -431,7 +431,7 @@ export function LotWiseTable({
                     </div>
                   )}
 
-                  {/* 30% Calculation - Only for Goods */}
+                  {/* 30% Calculation - For Goods */}
                   {tenderType === 'Goods' && (
                     <div className="col-span-1">
                       <div className={`text-xs h-7 w-full px-3 py-1 border rounded flex items-center font-medium ${
@@ -440,14 +440,14 @@ export function LotWiseTable({
                           : 'bg-blue-50 border-blue-200 text-blue-700'
                       }`}>
                         {lot.mseRelaxation 
-                          ? Math.round((lot.quantitySupplied || 0) * 0.255) // 25.5% for MSE
+                          ? Math.round((lot.quantitySupplied || 0) * 0.15) // 15% for MSE
                           : Math.round((lot.quantitySupplied || 0) * 0.3)    // 30% for Non-MSE
                         }
                       </div>
                     </div>
                   )}
 
-                  {/* MSE Checkbox - Only for Goods */}
+                  {/* MSE Checkbox - For Goods */}
                   {tenderType === 'Goods' && (
                     <div className="col-span-1 flex items-center justify-center">
                       <input
@@ -531,7 +531,7 @@ export function LotWiseTable({
               ))}
 
               {/* Summary Row */}
-              <div className={`grid gap-2 p-3 bg-gradient-to-r from-amber-100 to-orange-100 border-t-2 border-amber-300 font-bold text-amber-900 text-xs ${tenderType === 'Goods' ? 'grid-cols-12' : 'grid-cols-10'}`}>
+              <div className={`grid gap-2 p-3 bg-gradient-to-r from-amber-100 to-orange-100 border-t-2 border-amber-300 font-bold text-amber-900 text-xs ${tenderType === 'Goods' ? 'grid-cols-[repeat(13,minmax(0,1fr))]' : 'grid-cols-10'}`}>
                 <div className="col-span-1">TOTALS</div>
                 <div className="col-span-1">-</div>
                 <div className="col-span-1">₹{Math.round(getTotalCECInclGst() * 10) / 10}Cr</div>
@@ -543,7 +543,7 @@ export function LotWiseTable({
                     <div className="col-span-1">
                       {Math.round(lots.reduce((total, lot) => {
                         const quantity = lot.quantitySupplied || 0;
-                        return total + (lot.mseRelaxation ? quantity * 0.255 : quantity * 0.3);
+                        return total + (lot.mseRelaxation ? quantity * 0.15 : quantity * 0.3);
                       }, 0))}
                     </div>
                     <div className="col-span-1">{lots.filter(lot => lot.mseRelaxation).length}</div>

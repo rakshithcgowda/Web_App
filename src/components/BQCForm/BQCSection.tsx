@@ -1,6 +1,6 @@
-import type { BQCData } from '@/types';
+import type { BQCData, ManufacturerType } from '@/types';
 import { MANUFACTURER_TYPES, COMMERCIAL_EVALUATION_OPTIONS } from '@/utils/constants';
-import { formatCurrency, formatPercentage, formatTurnoverAmount, calculateBQCEMD, formatEMDAmount } from '@/utils/calculations';
+import { formatCurrency, formatTurnoverAmount } from '@/utils/calculations';
 import { ExplanatoryNote } from '../ExplanatoryNote';
 import { useState } from 'react';
 
@@ -34,7 +34,7 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
     let newTypes;
     
     if (checked) {
-      newTypes = [...currentTypes, type as any];
+      newTypes = [...currentTypes, type as ManufacturerType];
     } else {
       newTypes = currentTypes.filter(t => t !== type);
     }
@@ -466,13 +466,19 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
         {/* Past Performance Section for Goods */}
         {data.tenderType === 'Goods' && data.evaluationMethodology !== 'least cash outflow' && (
           <div className="form-group">
-            <h4 className="text-lg font-semibold text-gray-900 mb-6">Past Performance Requirements</h4>
+            <h4 className="text-lg font-semibold text-gray-900 mb-6">Supplying Capacity</h4>
             
             <div className="border border-gray-200 rounded-xl p-6 mb-6 bg-gradient-to-br from-purple-50 to-pink-50">
-              <h5 className="text-lg font-semibold text-gray-900 mb-4">Quantity Supplied Requirements</h5>
+              <h5 className="text-lg font-semibold text-gray-900 mb-4">Non-MSE (Standard) Requirements</h5>
               <p className="text-sm text-gray-700 mb-4">
-                The bidder should have supplied similar goods in the last Seven (7) years. The quantity supplied should be at least 30% of the total quantity required for each lot.
+                The bidder should have supplied similar goods in the last Seven (7) years. The quantity supplied should be at least 30% of the total quantity required for each lot as per below table.
               </p>
+              
+              <div className="mb-4 p-3 bg-purple-100 rounded-lg border border-purple-200">
+                <p className="text-sm text-purple-800 font-medium">
+                  For MSE bidders, Relaxation of 15% on the supplying capacity shall be given as per Corp. Finance Circular MA.TEC.POL.CON.3A dated 26.10.2020.
+                </p>
+              </div>
               
               {/* Toggle Controls */}
               <div className="mb-4 p-4 bg-white rounded-lg border border-purple-200">
@@ -499,7 +505,7 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
                       onChange={(e) => setShowMseCalculations(e.target.checked)}
                     />
                     <label htmlFor="showMse" className="ml-2 text-sm text-gray-700 font-medium">
-                      Show MSE (25.5%)
+                      Show MSE (15%)
                     </label>
                   </div>
                 </div>
@@ -530,7 +536,7 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
                           )}
                           {showMseCalculations && (
                             <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              MSE (25.5%)
+                              MSE (15%)
                             </th>
                           )}
                         </tr>
@@ -539,7 +545,7 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
                         {data.lots.map((lot, index) => {
                           const quantityRequired = lot.quantitySupplied || 0;
                           const nonMseRequirement = Math.round(quantityRequired * 0.3);
-                          const mseRequirement = Math.round(quantityRequired * 0.255); // 30% * (1 - 0.15) = 25.5%
+                          const mseRequirement = Math.round(quantityRequired * 0.15); // 15% for MSE
                           
                           return (
                             <tr key={index} className="hover:bg-gray-50">
@@ -584,7 +590,7 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
                           )}
                           {showMseCalculations && (
                             <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                              {Math.round(data.lots.reduce((total, lot) => total + ((lot.quantitySupplied || 0) * 0.255), 0)).toLocaleString()}
+                              {Math.round(data.lots.reduce((total, lot) => total + ((lot.quantitySupplied || 0) * 0.15), 0)).toLocaleString()}
                             </td>
                           )}
                         </tr>
@@ -602,20 +608,19 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
               
               <div className="mt-4 p-3 bg-purple-100 rounded-lg">
                 <p className="text-sm text-purple-800 font-medium">
-                  <strong>Note:</strong> MSE (Micro and Small Enterprises) bidders get 15% relaxation on past performance requirements. 
-                  Non-MSE bidders need to show 30% of total quantity, while MSE bidders need to show 25.5% of total quantity.
+                  <strong>Note:</strong> Bidder can quote for any one or more than one LOT based on their capability/choice. If the Bidder quotes for more than one LOT, the supplying capacity criteria should not be less than the cumulative amount applicable for the LOTs quoted.
                 </p>
               </div>
             </div>
 
             {/* Explanatory Note for Past Performance */}
             <ExplanatoryNote
-              label="Past Performance Requirements"
+              label="Supplying Capacity"
               checked={data.hasPastPerformanceExplanatoryNote || false}
               onCheckedChange={(checked) => onChange({ hasPastPerformanceExplanatoryNote: checked })}
               value={data.pastPerformanceExplanatoryNote || ''}
               onValueChange={(value) => onChange({ pastPerformanceExplanatoryNote: value })}
-              placeholder="Add any additional information about past performance requirements..."
+              placeholder="Add any additional information about supplying capacity requirements..."
             />
           </div>
         )}

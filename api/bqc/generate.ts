@@ -43,9 +43,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (bqcData.lots && bqcData.lots.length > 0) {
       console.log('Lots data:');
       bqcData.lots.forEach((lot: any, index: number) => {
+        // Parse CEC values to ensure they're numbers
+        const parsedCecIncl = typeof lot.cecEstimateInclGst === 'string' 
+          ? parseFloat(lot.cecEstimateInclGst) || 0 
+          : (lot.cecEstimateInclGst || 0);
+        const parsedCecExcl = typeof lot.cecEstimateExclGst === 'string'
+          ? parseFloat(lot.cecEstimateExclGst) || 0
+          : (lot.cecEstimateExclGst || 0);
+        
         console.log(`  Lot ${index + 1}:`, {
           lotNumber: lot.lotNumber,
           cecEstimateInclGst: lot.cecEstimateInclGst,
+          cecEstimateInclGstType: typeof lot.cecEstimateInclGst,
+          cecEstimateInclGstParsed: parsedCecIncl,
           cecEstimateExclGst: lot.cecEstimateExclGst,
           contractPeriodText: lot.contractPeriodText,
           contractPeriodMonths: lot.contractPeriodMonths,
@@ -59,10 +69,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
         
         // Debug: Check if CEC values are actually 0
-        if (lot.cecEstimateInclGst === 0) {
-          console.warn(`WARNING: Lot ${index + 1} (${lot.lotNumber}) has CEC Estimate = 0. This will cause all calculated values to be 0.`);
+        if (parsedCecIncl === 0 || isNaN(parsedCecIncl)) {
+          console.error(`❌ ERROR: Lot ${index + 1} (${lot.lotNumber}) has CEC Estimate = ${lot.cecEstimateInclGst} (type: ${typeof lot.cecEstimateInclGst}, parsed: ${parsedCecIncl})`);
         } else {
-          console.log(`✅ Lot ${index + 1} has CEC Estimate = ${lot.cecEstimateInclGst}`);
+          console.log(`✅ Lot ${index + 1} has CEC Estimate = ${parsedCecIncl} (type: ${typeof lot.cecEstimateInclGst})`);
         }
       });
     } else {
@@ -70,7 +80,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     // Additional debug: Check if we have any non-zero CEC values
-    const hasNonZeroCEC = bqcData.lots?.some((lot: any) => lot.cecEstimateInclGst > 0);
+    const hasNonZeroCEC = bqcData.lots?.some((lot: any) => {
+      const parsedCec = typeof lot.cecEstimateInclGst === 'string'
+        ? parseFloat(lot.cecEstimateInclGst) || 0
+        : (lot.cecEstimateInclGst || 0);
+      return parsedCec > 0;
+    });
     console.log('Has non-zero CEC values:', hasNonZeroCEC);
     
     if (!hasNonZeroCEC) {
@@ -79,11 +94,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('1. Has not entered CEC values for any lots');
       console.error('2. The data is being cleared somewhere in the process');
       console.error('3. There is a bug in the data flow');
+      console.error('');
+      console.error('Suggestion: Check the frontend to ensure:');
+      console.error('- CEC values are being entered correctly in the UI');
+      console.error('- Data is being saved before generating');
+      console.error('- Data is being passed correctly to the generate API');
       
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot generate document: No lots have CEC values greater than 0. Please enter CEC estimates for at least one lot before generating the document.'
-      });
+      // Don't return error - let the generation proceed so user can see what data was sent
+      console.error('⚠️ Continuing with generation to show debug output, but values will be 0.00');
     }
     
     console.log('Contract Duration Years:', bqcData.contractDurationYears);
@@ -142,26 +160,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Calculate lot-wise values
     const calculateLotValues = (lots: any[]) => {
       console.log('=== CALCULATE LOT VALUES DEBUG ===');
-      console.log('Input lots:', lots);
+      console.log('Input lots:', JSON.stringify(lots, null, 2));
       
       return lots.map((lot, index) => {
-        console.log(`Processing lot ${index + 1}:`, lot);
+        console.log(`Processing lot ${index + 1}:`, JSON.stringify(lot, null, 2));
         
-        const cecInclGst = lot.cecEstimateInclGst || 0;
-        const cecExclGst = lot.cecEstimateExclGst || 0;
+        // Parse CEC values - handle both string and number types
+        const cecInclGst = typeof lot.cecEstimateInclGst === 'string' 
+          ? parseFloat(lot.cecEstimateInclGst) || 0 
+          : (lot.cecEstimateInclGst || 0);
+        const cecExclGst = typeof lot.cecEstimateExclGst === 'string'
+          ? parseFloat(lot.cecEstimateExclGst) || 0
+          : (lot.cecEstimateExclGst || 0);
         
-        console.log(`Lot ${index + 1} - CEC Incl GST:`, cecInclGst);
-        console.log(`Lot ${index + 1} - CEC Excl GST:`, cecExclGst);
+        console.log(`Lot ${index + 1} - CEC Incl GST (parsed):`, cecInclGst, '(raw:', lot.cecEstimateInclGst, ')');
+        console.log(`Lot ${index + 1} - CEC Excl GST (parsed):`, cecExclGst, '(raw:', lot.cecEstimateExclGst, ')');
         
         // Debug: Check if CEC values are actually 0
-        if (cecInclGst === 0) {
-          console.warn(`WARNING: Lot ${index + 1} has CEC Estimate = 0. This will cause all calculated values to be 0.`);
-          console.warn(`This means Technical Criteria and Financial Criteria will show as 0.00 in the document.`);
-          console.warn(`EMD values will still show because they use hardcoded calculation logic.`);
+        if (cecInclGst === 0 || isNaN(cecInclGst)) {
+          console.error(`❌ ERROR: Lot ${index + 1} (${lot.lotNumber}) has invalid CEC Estimate = ${lot.cecEstimateInclGst}`);
+          console.error(`This will cause all calculated values to be 0.`);
+          console.error(`Please ensure CEC values are entered properly in the UI.`);
         }
         
         // Use EXACT same calculation logic as UI (BQCSection.tsx)
-        const baseAmount = lot.cecEstimateInclGst || 0;
+        const baseAmount = cecInclGst;
         
         // Parse contract period from text or use numeric value (EXACT same as UI)
         let contractMonths = lot.contractPeriodMonths || 12;
@@ -235,9 +258,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     };
 
-    // Calculate total values
-    const totalCECInclGst = bqcData.lots?.reduce((sum: number, lot: any) => sum + (lot.cecEstimateInclGst || 0), 0) || 0;
-    const totalCECExclGst = bqcData.lots?.reduce((sum: number, lot: any) => sum + (lot.cecEstimateExclGst || 0), 0) || 0;
+    // Debug: Log lots data before processing
+    console.log('=== BEFORE calculateLotValues ===');
+    console.log('Number of lots:', bqcData.lots?.length || 0);
+    if (bqcData.lots && bqcData.lots.length > 0) {
+      console.log('Lots summary:', bqcData.lots.map((lot: any) => ({
+        lotNumber: lot.lotNumber,
+        cecIncl: lot.cecEstimateInclGst,
+        cecInclType: typeof lot.cecEstimateInclGst
+      })));
+    }
+    
+    // Calculate total values - handle both string and number types
+    const totalCECInclGst = bqcData.lots?.reduce((sum: number, lot: any) => {
+      const lotCEC = typeof lot.cecEstimateInclGst === 'string'
+        ? parseFloat(lot.cecEstimateInclGst) || 0
+        : (lot.cecEstimateInclGst || 0);
+      return sum + lotCEC;
+    }, 0) || 0;
+    const totalCECExclGst = bqcData.lots?.reduce((sum: number, lot: any) => {
+      const lotCEC = typeof lot.cecEstimateExclGst === 'string'
+        ? parseFloat(lot.cecEstimateExclGst) || 0
+        : (lot.cecEstimateExclGst || 0);
+      return sum + lotCEC;
+    }, 0) || 0;
+    
+    console.log('Total CEC Incl GST:', totalCECInclGst);
+    console.log('Total CEC Excl GST:', totalCECExclGst);
     
     // Calculate total annualized value based on contract duration
     const contractDurationYears = bqcData.contractDurationYears || 1;
@@ -281,19 +328,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
     
-    // Check if any lot has CEC values
-    const hasValidCECData = processedLots.some(lot => (lot.cecEstimateInclGst || 0) > 0);
+    // Check if any lot has CEC values - use parsed values
+    const hasValidCECData = processedLots.some(lot => {
+      const parsedCec = typeof lot.cecEstimateInclGst === 'string'
+        ? parseFloat(lot.cecEstimateInclGst) || 0
+        : (lot.cecEstimateInclGst || 0);
+      return parsedCec > 0;
+    });
+    
     if (!hasValidCECData) {
       console.log('ERROR: No valid CEC data found in lots');
       console.log('Processed lots:', processedLots.map(lot => ({
         lotNumber: lot.lotNumber,
         cecEstimateInclGst: lot.cecEstimateInclGst,
+        cecEstimateInclGstType: typeof lot.cecEstimateInclGst,
         cecEstimateExclGst: lot.cecEstimateExclGst
       })));
-      return res.status(400).json({
-        success: false,
-        message: 'No CEC estimate values found in lots. Please enter CEC estimates for at least one lot before generating the document. Go to the Preamble tab and add CEC values for each lot.'
-      });
+      console.log('⚠️ Continuing to show all zeros in document for debugging purposes');
+      // Don't return error - let user see the document with zeros to debug
     }
 
     // Create document with BPCL format
@@ -632,6 +684,228 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ],
             spacing: { after: 200 },
           }),
+
+          // 3.1.1 For GOODS: Manufacturing Capability and Supplying Capacity
+          ...(bqcData.tenderType === 'Goods' && bqcData.evaluationMethodology === 'Lot-wise' ? [
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "3.1.1. For GOODS:",
+                  bold: true,
+                  size: 22,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "Manufacturing Capability:",
+                  bold: true,
+                  size: 22,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 100 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: `Bidder* should be ${bqcData.manufacturerTypes?.join(' AND/OR ') || 'Original Equipment Manufacturer AND/OR Authorized Channel Partner AND/OR Authorized Agent AND/OR Dealer AND/OR Authorized Distributor'} of the item being tendered.`,
+                  size: 22,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "Supplying Capacity:",
+                  bold: true,
+                  size: 22,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "Non-MSE (Standard) Requirements:\nThe bidder should have supplied similar goods in the last Seven (7) years. The quantity supplied should be at least 30% of the total quantity required for each lot as per below table.",
+                  size: 22,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "For MSE bidders, Relaxation of 15% on the supplying capacity shall be given as per Corp. Finance Circular MA.TEC.POL.CON.3A dated 26.10.2020.",
+                  size: 22,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+
+            // Supplying Capacity table
+            ...(processedLots && processedLots.length > 0 ? [
+              new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                borders: {
+                  top: { style: BorderStyle.SINGLE, size: 1 },
+                  bottom: { style: BorderStyle.SINGLE, size: 1 },
+                  left: { style: BorderStyle.SINGLE, size: 1 },
+                  right: { style: BorderStyle.SINGLE, size: 1 },
+                  insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
+                  insideVertical: { style: BorderStyle.SINGLE, size: 1 },
+                },
+                rows: [
+                  // Header row
+                  new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "Sr. No.", bold: true, size: 20, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 10, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "Section / Description", bold: true, size: 20, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 30, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "Quantity Required", bold: true, size: 20, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 20, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "Non-MSE (30%)", bold: true, size: 20, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 20, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "MSE (15%)", bold: true, size: 20, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 20, type: WidthType.PERCENTAGE },
+                    }),
+                  ],
+                }),
+                // Data rows
+                ...processedLots.map((lot, index) => {
+                  const quantityRequired = lot.quantitySupplied || 0;
+                  const nonMseRequirement = Math.round(quantityRequired * 0.3);
+                  const mseRequirement = Math.round(quantityRequired * 0.15); // 15% for MSE
+                  
+                  return new TableRow({
+                    children: [
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${index + 1}`, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${lot.lotNumber || `LOT-${index + 1}`}`, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.LEFT,
+                        })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${quantityRequired.toLocaleString()}`, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${nonMseRequirement.toLocaleString()}`, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${mseRequirement.toLocaleString()}`, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                    ],
+                  });
+                }),
+                // Total row
+                (() => {
+                  const totalQuantity = processedLots.reduce((sum, lot) => sum + (lot.quantitySupplied || 0), 0);
+                  const totalNonMse = Math.round(totalQuantity * 0.3);
+                  const totalMse = Math.round(totalQuantity * 0.15);
+                  
+                  return new TableRow({
+                    children: [
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${processedLots.length + 1}`, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: "TOTAL FOR ALL LOTS", bold: true, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.LEFT,
+                        })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${totalQuantity.toLocaleString()}`, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${totalNonMse.toLocaleString()}`, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${totalMse.toLocaleString()}`, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                    ],
+                  });
+                })(),
+                ],
+              }),
+            ] : []),
+
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "Bidder can quote for any one or more than one LOT based on their capability/choice.",
+                  size: 22,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { before: 200, after: 400 },
+            }),
+          ] : []),
 
           // 3.1.1 PROVEN TRACK RECORD
           new Paragraph({
@@ -1219,8 +1493,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               }),
               // Data rows for each lot
               ...processedLots.map((lot, index) => {
-                // Use hardcoded EMD amounts as per user requirements
-                const lotCEC = lot.cecEstimateInclGst || 0;
+                // Parse CEC value - handle both string and number types
+                const lotCEC = typeof lot.cecEstimateInclGst === 'string'
+                  ? parseFloat(lot.cecEstimateInclGst) || 0
+                  : (lot.cecEstimateInclGst || 0);
                 
                 // EMD amounts as per the specified criteria: [2.5, 1, 0, 1, 1] for Lot 1, 2, 3, 4, 5
                 const emdAmounts = [2.5, 1, 0, 1, 1];
@@ -1231,7 +1507,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   cecEstimateInclGst: lot.cecEstimateInclGst,
                   lotCEC,
                   emdAmount,
-                  cecInLakhs: lotCEC * 100
+                  cecInLakhs: lotCEC * 100,
+                  cecRawType: typeof lot.cecEstimateInclGst
                 });
                 
                 return new TableRow({
