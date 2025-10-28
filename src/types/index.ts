@@ -88,6 +88,7 @@ export interface BQCData {
   divisibility: 'Divisible' | 'Non-Divisible';
   performanceSecurity: string;
   hasPerformanceSecurity: boolean;
+  provenTrackRecordMseRelaxation?: boolean; // MSE relaxation for proven track record table
   proposedBy: string;
   proposedByDesignation: string;
   recommendedBy: string;

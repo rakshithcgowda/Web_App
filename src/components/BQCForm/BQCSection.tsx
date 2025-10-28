@@ -127,30 +127,55 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
                 <div className="mb-6 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
                   <h6 className="text-lg font-semibold text-blue-900 mb-2">3.1.2. BQC/PQC for Procurement of Works and Services</h6>
                   <h6 className="text-lg font-semibold text-blue-900 mb-4">3.1.1 PROVEN TRACK RECORD</h6>
+                  
+                  {/* MSE Relaxation Checkbox */}
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-300 rounded-lg">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="provenTrackRecordMseRelaxation"
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        checked={data.provenTrackRecordMseRelaxation || false}
+                        onChange={(e) => onChange({ provenTrackRecordMseRelaxation: e.target.checked })}
+                      />
+                      <label htmlFor="provenTrackRecordMseRelaxation" className="ml-2 text-sm font-medium text-gray-700">
+                        Apply 15% MSE Relaxation for Proven Track Record
+                      </label>
+                    </div>
+                    <p className="text-xs text-blue-700 mt-1 ml-6">
+                      When enabled, the table will show both standard and MSE-adjusted values
+                    </p>
+                  </div>
+                  
                   <p className="text-sm text-blue-800 mb-4">
                     The bidder shall have experience of having successfully executed similar works in the last Seven (7) years in any Oil & Gas Industry in India. The Value (Rs) of the similar work/s executed (proof of execution to be submitted) should be as follows:
                   </p>
                   
                     {data.lots && data.lots.length > 0 ? (
-                    <div className="bg-white rounded-lg border border-blue-200 overflow-hidden">
+                      <div className="space-y-6">
+                        {/* Standard Requirements Table */}
+                        <div className="bg-white rounded-lg border border-blue-200 overflow-hidden">
+                          <div className="bg-blue-50 px-4 py-2 border-b border-blue-200">
+                            <h6 className="text-sm font-semibold text-blue-900">Standard Requirements (Non-MSE)</h6>
+                          </div>
                           <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
                               <thead className="bg-gray-50">
                                 <tr>
                                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Sr. No.
-                              </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Section / Description
+                                    Sr. No.
+                                  </th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Section / Description
                                   </th>
                                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                One similar work of total value not less than (Rs. in Lakhs)
+                                    One similar work of total value not less than (Rs. in Lakhs)
                                   </th>
                                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Two similar works EACH of value not less than (Rs. in Lakhs)
+                                    Two similar works EACH of value not less than (Rs. in Lakhs)
                                   </th>
                                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Three similar works EACH of value not less than (Rs. in Lakhs)
+                                    Three similar works EACH of value not less than (Rs. in Lakhs)
                                   </th>
                                 </tr>
                               </thead>
@@ -173,38 +198,121 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
                                   
                                   const contractYears = contractMonths / 12;
                                   const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
-                                  const finalAmount = lot.mseRelaxation ? annualizedAmount * 0.85 : annualizedAmount;
                                   
-                              // Convert to Lakhs for display (1 Crore = 100 Lakhs)
-                              const amountInLakhs = finalAmount * 100;
-                              
-                              const optionA = amountInLakhs * 0.8; // 80% - One work
-                              const optionB = amountInLakhs * 0.5; // 50% - Two works each
-                              const optionC = amountInLakhs * 0.4; // 40% - Three works each
+                                  // Convert to Lakhs for display (1 Crore = 100 Lakhs)
+                                  const amountInLakhs = annualizedAmount * 100;
+                                  
+                                  // Standard requirements
+                                  const optionA = amountInLakhs * 0.8; // 80% - One work
+                                  const optionB = amountInLakhs * 0.5; // 50% - Two works each
+                                  const optionC = amountInLakhs * 0.4; // 40% - Three works each
                                   
                                   return (
                                     <tr key={index} className="hover:bg-gray-50">
+                                      <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-center">
+                                        {index + 1}
+                                      </td>
                                       <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    {index + 1}
-                                  </td>
-                                  <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    {lot.lotNumber || `Lot ${index + 1}`}
+                                        {lot.lotNumber || `Lot ${index + 1}`}
                                       </td>
                                       <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                                    {Math.round(optionA * 100) / 100}
+                                        {Math.round(optionA * 100) / 100}
                                       </td>
                                       <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                                    {Math.round(optionB * 100) / 100}
+                                        {Math.round(optionB * 100) / 100}
                                       </td>
                                       <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                                    {Math.round(optionC * 100) / 100}
+                                        {Math.round(optionC * 100) / 100}
                                       </td>
                                     </tr>
                                   );
                                 })}
                               </tbody>
                             </table>
+                          </div>
                         </div>
+
+                        {/* MSE Requirements Table - Only shown when MSE relaxation is checked */}
+                        {data.provenTrackRecordMseRelaxation && (
+                          <div className="bg-white rounded-lg border border-green-200 overflow-hidden">
+                            <div className="bg-green-50 px-4 py-2 border-b border-green-200">
+                              <h6 className="text-sm font-semibold text-green-900">MSE Requirements (15% Reduction)</h6>
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                  <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Sr. No.
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Section / Description
+                                    </th>
+                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      One similar work of total value not less than (Rs. in Lakhs)
+                                    </th>
+                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Two similar works EACH of value not less than (Rs. in Lakhs)
+                                    </th>
+                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Three similar works EACH of value not less than (Rs. in Lakhs)
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                  {data.lots.map((lot, index) => {
+                                    const baseAmount = lot.cecEstimateInclGst || 0;
+                                    
+                                    // Parse contract period from text or use numeric value
+                                    let contractMonths = lot.contractPeriodMonths || 12;
+                                    if (lot.contractPeriodText) {
+                                      const textMatch = lot.contractPeriodText.match(/(\d+)/);
+                                      if (textMatch) {
+                                        contractMonths = parseInt(textMatch[1]);
+                                        // Handle years conversion
+                                        if (lot.contractPeriodText.toLowerCase().includes('year')) {
+                                          contractMonths = contractMonths * 12;
+                                        }
+                                      }
+                                    }
+                                    
+                                    const contractYears = contractMonths / 12;
+                                    const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+                                    
+                                    // Convert to Lakhs for display (1 Crore = 100 Lakhs)
+                                    const amountInLakhs = annualizedAmount * 100;
+                                    const mseAmountInLakhs = amountInLakhs * 0.85;
+                                    
+                                    // MSE requirements (with 15% reduction)
+                                    const mseOptionA = mseAmountInLakhs * 0.8;
+                                    const mseOptionB = mseAmountInLakhs * 0.5;
+                                    const mseOptionC = mseAmountInLakhs * 0.4;
+                                    
+                                    return (
+                                      <tr key={index} className="hover:bg-gray-50">
+                                        <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-center">
+                                          {index + 1}
+                                        </td>
+                                        <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                          {lot.lotNumber || `Lot ${index + 1}`}
+                                        </td>
+                                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                                          {Math.round(mseOptionA * 100) / 100}
+                                        </td>
+                                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                                          {Math.round(mseOptionB * 100) / 100}
+                                        </td>
+                                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                                          {Math.round(mseOptionC * 100) / 100}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
                     <div className="bg-white rounded-lg border border-blue-200 p-4">
@@ -343,18 +451,20 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
           )}
 
           {/* Explanatory Note for Experience Requirements */}
-          <ExplanatoryNote
-            label="Experience Requirements"
-            checked={data.hasExperienceExplanatoryNote || false}
-            onCheckedChange={(checked) => onChange({ hasExperienceExplanatoryNote: checked })}
-            value={data.experienceExplanatoryNote || ''}
-            onValueChange={(value) => onChange({ experienceExplanatoryNote: value })}
-            placeholder="Add any additional information about experience requirements..."
-          />
+          {!(data.tenderType === 'Goods' && data.evaluationMethodology === 'least cash outflow') && (
+            <ExplanatoryNote
+              label="Experience Requirements"
+              checked={data.hasExperienceExplanatoryNote || false}
+              onCheckedChange={(checked) => onChange({ hasExperienceExplanatoryNote: checked })}
+              value={data.experienceExplanatoryNote || ''}
+              onValueChange={(value) => onChange({ experienceExplanatoryNote: value })}
+              placeholder="Add any additional information about experience requirements..."
+            />
+          )}
         </div>
 
         {/* Past Performance Section for Goods */}
-        {data.tenderType === 'Goods' && (
+        {data.tenderType === 'Goods' && data.evaluationMethodology !== 'least cash outflow' && (
           <div className="form-group">
             <h4 className="text-lg font-semibold text-gray-900 mb-6">Past Performance Requirements</h4>
             

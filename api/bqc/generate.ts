@@ -688,36 +688,81 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                       children: [new TextRun({ text: "Sr. No.", bold: true, size: 20, font: "Arial" })],
                       alignment: AlignmentType.CENTER,
                     })],
-                    width: { size: 10, type: WidthType.PERCENTAGE },
+                    width: { size: 7, type: WidthType.PERCENTAGE },
                   }),
                   new TableCell({
                     children: [new Paragraph({
                       children: [new TextRun({ text: "Section / Description", bold: true, size: 20, font: "Arial" })],
                       alignment: AlignmentType.CENTER,
                     })],
-                    width: { size: 25, type: WidthType.PERCENTAGE },
+                    width: { size: 15, type: WidthType.PERCENTAGE },
                   }),
-                  new TableCell({
-                    children: [new Paragraph({
-                      children: [new TextRun({ text: "One similar work of total value not less than (Rs. in Lakhs)", bold: true, size: 20, font: "Arial" })],
-                      alignment: AlignmentType.CENTER,
-                    })],
-                    width: { size: 20, type: WidthType.PERCENTAGE },
-                  }),
-                  new TableCell({
-                    children: [new Paragraph({
-                      children: [new TextRun({ text: "OR Two similar works EACH of value not less than (Rs. in Lakhs)", bold: true, size: 20, font: "Arial" })],
-                      alignment: AlignmentType.CENTER,
-                    })],
-                    width: { size: 20, type: WidthType.PERCENTAGE },
-                  }),
-                  new TableCell({
-                    children: [new Paragraph({
-                      children: [new TextRun({ text: "OR Three similar works EACH of value not less than (Rs. in Lakhs)", bold: true, size: 20, font: "Arial" })],
-                      alignment: AlignmentType.CENTER,
-                    })],
-                    width: { size: 25, type: WidthType.PERCENTAGE },
-                  }),
+                  ...(bqcData.provenTrackRecordMseRelaxation ? [
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "One similar work of total value not less than (Rs. in Lakhs) - Standard", bold: true, size: 18, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 13, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "Two similar works EACH of value not less than (Rs. in Lakhs) - Standard", bold: true, size: 18, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 13, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "Three similar works EACH of value not less than (Rs. in Lakhs) - Standard", bold: true, size: 18, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 13, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "One similar work (MSE - 15% reduction) (Rs. in Lakhs)", bold: true, size: 18, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 13, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "Two similar works EACH (MSE - 15% reduction) (Rs. in Lakhs)", bold: true, size: 18, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 13, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "Three similar works EACH (MSE - 15% reduction) (Rs. in Lakhs)", bold: true, size: 18, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 13, type: WidthType.PERCENTAGE },
+                    }),
+                  ] : [
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "One similar work of total value not less than (Rs. in Lakhs)", bold: true, size: 20, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 20, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "OR Two similar works EACH of value not less than (Rs. in Lakhs)", bold: true, size: 20, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 20, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({ text: "OR Three similar works EACH of value not less than (Rs. in Lakhs)", bold: true, size: 20, font: "Arial" })],
+                        alignment: AlignmentType.CENTER,
+                      })],
+                      width: { size: 28, type: WidthType.PERCENTAGE },
+                    }),
+                  ]),
                 ],
               }),
               // Data rows for each lot
@@ -727,12 +772,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const optionB = lot.optionB || 0;
                 const optionC = lot.optionC || 0;
                 
+                // Calculate MSE values (15% reduction)
+                const mseOptionA = optionA * 0.85;
+                const mseOptionB = optionB * 0.85;
+                const mseOptionC = optionC * 0.85;
+                
                 console.log(`Technical Criteria Table - Lot ${index + 1}:`, {
                   lotNumber: lot.lotNumber,
                   cecEstimateInclGst: lot.cecEstimateInclGst,
                   optionA,
                   optionB,
                   optionC,
+                  mseOptionA,
+                  mseOptionB,
+                  mseOptionC,
                   formattedA: Math.round((optionA || 0) * 100) / 100,
                   formattedB: Math.round((optionB || 0) * 100) / 100,
                   formattedC: Math.round((optionC || 0) * 100) / 100,
@@ -774,6 +827,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         alignment: AlignmentType.CENTER,
                       })],
                     }),
+                    ...(bqcData.provenTrackRecordMseRelaxation ? [
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${(Math.round(mseOptionA * 100) / 100).toFixed(2)}`, size: 20, font: "Arial", color: "006400" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${(Math.round(mseOptionB * 100) / 100).toFixed(2)}`, size: 20, font: "Arial", color: "006400" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: `${(Math.round(mseOptionC * 100) / 100).toFixed(2)}`, size: 20, font: "Arial", color: "006400" })],
+                          alignment: AlignmentType.CENTER,
+                        })],
+                      }),
+                    ] : []),
                   ],
                 });
               }),

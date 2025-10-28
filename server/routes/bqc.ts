@@ -1818,7 +1818,19 @@ router.post('/generate', async (req: AuthRequest, res) => {
               spacing: { after: 200 },
             }),
             
-            // Lot-wise Technical Criteria table
+            // Standard Requirements Table (always shown)
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "Standard Requirements (Non-MSE)", 
+                  bold: true,
+                  size: 24,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 100 },
+            }),
+            
             new Table({
               width: {
                 size: 100,
@@ -1942,11 +1954,11 @@ router.post('/generate', async (req: AuthRequest, res) => {
                   
                   const contractYears = contractMonths / 12;
                   const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
-                  const finalAmount = lot.mseRelaxation ? annualizedAmount * 0.85 : annualizedAmount;
                   
-                  const optionA = finalAmount * 0.8; // 80% - One work
-                  const optionB = finalAmount * 0.5; // 50% - Two works each
-                  const optionC = finalAmount * 0.4; // 40% - Three works each
+                  // Standard values (no MSE reduction)
+                  const optionA = annualizedAmount * 0.8; // 80% - One work
+                  const optionB = annualizedAmount * 0.5; // 50% - Two works each
+                  const optionC = annualizedAmount * 0.4; // 40% - Three works each
                   
                   return new TableRow({
                     children: [
@@ -2030,6 +2042,234 @@ router.post('/generate', async (req: AuthRequest, res) => {
                 }),
               ],
             }),
+            
+            // MSE Requirements Table - Only shown when MSE relaxation is enabled
+            ...(bqcData.provenTrackRecordMseRelaxation ? [
+              new Paragraph({
+                children: [
+                  new TextRun({ 
+                    text: "MSE Requirements (15% Reduction)", 
+                    bold: true,
+                    size: 24,
+                    font: "Arial"
+                  }),
+                ],
+                spacing: { before: 200, after: 100 },
+              }),
+              
+              new Table({
+                width: {
+                  size: 100,
+                  type: WidthType.PERCENTAGE,
+                },
+                borders: {
+                  top: { style: BorderStyle.SINGLE, size: 1 },
+                  bottom: { style: BorderStyle.SINGLE, size: 1 },
+                  left: { style: BorderStyle.SINGLE, size: 1 },
+                  right: { style: BorderStyle.SINGLE, size: 1 },
+                  insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
+                  insideVertical: { style: BorderStyle.SINGLE, size: 1 },
+                },
+                rows: [
+                  // Header row
+                  new TableRow({
+                    children: [
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: "Sr. No.", 
+                                bold: true, 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                        width: { size: 15, type: WidthType.PERCENTAGE },
+                      }),
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: "Section / Description", 
+                                bold: true, 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                        width: { size: 25, type: WidthType.PERCENTAGE },
+                      }),
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: "One similar work of total value not less than (Rs. in Lakhs)", 
+                                bold: true, 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                        width: { size: 20, type: WidthType.PERCENTAGE },
+                      }),
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: "Two similar works EACH of value not less than (Rs. in Lakhs)", 
+                                bold: true, 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                        width: { size: 20, type: WidthType.PERCENTAGE },
+                      }),
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: "Three similar works EACH of value not less than (Rs. in Lakhs)", 
+                                bold: true, 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                        width: { size: 20, type: WidthType.PERCENTAGE },
+                      }),
+                    ],
+                  }),
+                  // Data rows for each lot with MSE reduction
+                  ...bqcData.lots.map((lot: LotData, index: number) => {
+                    const baseAmount = lot.cecEstimateInclGst || 0;
+                    
+                    // Parse contract period from text or use numeric value
+                    let contractMonths = lot.contractPeriodMonths || 12;
+                    if (lot.contractPeriodText) {
+                      const textMatch = lot.contractPeriodText.match(/(\d+)/);
+                      if (textMatch) {
+                        contractMonths = parseInt(textMatch[1]);
+                        // Handle years conversion
+                        if (lot.contractPeriodText.toLowerCase().includes('year')) {
+                          contractMonths = contractMonths * 12;
+                        }
+                      }
+                    }
+                    
+                    const contractYears = contractMonths / 12;
+                    const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+                    
+                    // MSE values (with 15% reduction)
+                    const mseAnnualizedAmount = annualizedAmount * 0.85;
+                    const mseOptionA = mseAnnualizedAmount * 0.8;
+                    const mseOptionB = mseAnnualizedAmount * 0.5;
+                    const mseOptionC = mseAnnualizedAmount * 0.4;
+                    
+                    return new TableRow({
+                      children: [
+                        new TableCell({
+                          children: [
+                            new Paragraph({
+                              children: [
+                                new TextRun({ 
+                                  text: `${index + 1}`, 
+                                  size: 20,
+                                  font: "Arial"
+                                }),
+                              ],
+                              alignment: AlignmentType.CENTER,
+                              spacing: { after: 100 },
+                            }),
+                          ],
+                        }),
+                        new TableCell({
+                          children: [
+                            new Paragraph({
+                              children: [
+                                new TextRun({ 
+                                  text: lot.lotNumber || `LOT-${index + 1} (${lot.description || 'Region'})`, 
+                                  size: 20,
+                                  font: "Arial"
+                                }),
+                              ],
+                              alignment: AlignmentType.CENTER,
+                              spacing: { after: 100 },
+                            }),
+                          ],
+                        }),
+                        new TableCell({
+                          children: [
+                            new Paragraph({
+                              children: [
+                                new TextRun({ 
+                                  text: `${(mseOptionA / 100000).toFixed(2)}`, 
+                                  size: 20,
+                                  font: "Arial"
+                                }),
+                              ],
+                              alignment: AlignmentType.CENTER,
+                              spacing: { after: 100 },
+                            }),
+                          ],
+                        }),
+                        new TableCell({
+                          children: [
+                            new Paragraph({
+                              children: [
+                                new TextRun({ 
+                                  text: `${(mseOptionB / 100000).toFixed(2)}`, 
+                                  size: 20,
+                                  font: "Arial"
+                                }),
+                              ],
+                              alignment: AlignmentType.CENTER,
+                              spacing: { after: 100 },
+                            }),
+                          ],
+                        }),
+                        new TableCell({
+                          children: [
+                            new Paragraph({
+                              children: [
+                                new TextRun({ 
+                                  text: `${(mseOptionC / 100000).toFixed(2)}`, 
+                                  size: 20,
+                                  font: "Arial"
+                                }),
+                              ],
+                              alignment: AlignmentType.CENTER,
+                              spacing: { after: 100 },
+                            }),
+                          ],
+                        }),
+                      ],
+                    });
+                  }),
+                ],
+              }),
+            ] : []),
             
             new Paragraph({
               children: [
