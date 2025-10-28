@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { database } from '../../server/models/database-adapter.js';
-import { authenticateTokenVercel } from '../../server/middleware/auth.js';
+import { database } from '../../server/models/database-adapter';
+import { authenticateTokenVercel } from '../../server/middleware/auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers
@@ -31,8 +31,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    // Check if user is admin (username: admin)
+    const adminUser = await database.getUserById(authResult.userId!);
+    if (!adminUser || adminUser.username !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
     // Get group stats
-    const stats = await database.getAdminStatsGroups();
+    const stats = await database.getBQCGroupStats();
 
     res.json({
       success: true,

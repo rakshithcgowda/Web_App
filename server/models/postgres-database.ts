@@ -28,10 +28,31 @@ class PostgresDatabase {
           password VARCHAR(255) NOT NULL,
           email VARCHAR(255),
           full_name VARCHAR(255),
+          is_approved BOOLEAN DEFAULT FALSE,
+          approved_at TIMESTAMP,
+          approved_by INTEGER,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `;
       console.log('Users table created/verified');
+
+      // Add approval columns to existing users table if they don't exist
+      try {
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT FALSE`;
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP`;
+        await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS approved_by INTEGER`;
+        console.log('Approval columns added/verified');
+      } catch (error) {
+        console.log('Approval columns already exist or error adding them:', error);
+      }
+
+      // Set existing users as approved (for backward compatibility)
+      try {
+        await sql`UPDATE users SET is_approved = TRUE WHERE is_approved IS NULL OR is_approved = FALSE`;
+        console.log('Existing users set as approved');
+      } catch (error) {
+        console.log('Error updating existing users:', error);
+      }
 
       // Create bqc_data table
       await sql`
@@ -144,10 +165,54 @@ class PostgresDatabase {
 
   async getUserById(id: number): Promise<any> {
     const result = await sql`
-      SELECT id, username, email, full_name, created_at 
+      SELECT id, username, email, full_name, is_approved, approved_at, approved_by, created_at 
       FROM users WHERE id = ${id}
     `;
     return result.rows[0];
+  }
+
+  // User approval methods
+  async getPendingUsers(): Promise<any[]> {
+    const result = await sql`
+      SELECT id, username, email, full_name, created_at 
+      FROM users 
+      WHERE is_approved = FALSE 
+      ORDER BY created_at ASC
+    `;
+    return result.rows;
+  }
+
+  async approveUser(userId: number, approvedBy: number): Promise<void> {
+    await sql`
+      UPDATE users 
+      SET is_approved = TRUE, approved_at = CURRENT_TIMESTAMP, approved_by = ${approvedBy}
+      WHERE id = ${userId}
+    `;
+  }
+
+  async rejectUser(userId: number): Promise<void> {
+    await sql`
+      DELETE FROM users 
+      WHERE id = ${userId} AND is_approved = FALSE
+    `;
+  }
+
+  async getAllUsers(): Promise<any[]> {
+    const result = await sql`
+      SELECT 
+        u.id, 
+        u.username, 
+        u.email, 
+        u.full_name, 
+        u.is_approved, 
+        u.approved_at, 
+        u.created_at,
+        approver.username as approved_by_username
+      FROM users u
+      LEFT JOIN users approver ON u.approved_by = approver.id
+      ORDER BY u.created_at DESC
+    `;
+    return result.rows;
   }
 
   // BQC data operations
@@ -289,9 +354,21 @@ class PostgresDatabase {
         row.commercial_evaluation_method = [];
       }
       
+      // Parse lots data
+      try {
+        row.lots = JSON.parse(row.lots || '[]');
+      } catch {
+        row.lots = [];
+      }
+      
       return row;
     }
     return null;
+  }
+
+  // Alias method for compatibility with load API
+  async getBQCDataById(id: number, userId: number): Promise<any> {
+    return this.getBQCData(userId, id);
   }
 
   async listBQCData(userId: number): Promise<any[]> {
@@ -308,6 +385,75 @@ class PostgresDatabase {
     await sql`
       DELETE FROM bqc_data WHERE id = ${id} AND user_id = ${userId}
     `;
+  }
+
+  // Admin statistics methods - alias for compatibility
+  async getAdminStatsOverview(filters: {
+    startDate?: string;
+    endDate?: string;
+    groupName?: string;
+  } = {}): Promise<any> {
+    return this.getBQCStats(filters);
+  }
+
+  async getAdminStatsGroups(filters: {
+    startDate?: string;
+    endDate?: string;
+    groupName?: string;
+  } = {}): Promise<any[]> {
+    return this.getBQCGroupStats(filters);
+  }
+
+  async getAdminStatsDateRange(filters: {
+    startDate?: string;
+    endDate?: string;
+    groupBy: 'day' | 'week' | 'month';
+  }): Promise<any[]> {
+    return this.getBQCDateRangeStats(filters);
+  }
+
+  async getAdminStatsUsers(): Promise<any> {
+    return this.getUserStats();
+  }
+
+  async getAdminStatsTenderTypes(filters: {
+    startDate?: string;
+    endDate?: string;
+    groupName?: string;
+  } = {}): Promise<any[]> {
+    return this.getTenderTypeStats(filters);
+  }
+
+  async getAdminStatsFinancial(filters: {
+    startDate?: string;
+    endDate?: string;
+    groupName?: string;
+  } = {}): Promise<any> {
+    return this.getFinancialStats(filters);
+  }
+
+  async getAdminBQCEntries(filters: {
+    page: number;
+    limit: number;
+    startDate?: string;
+    endDate?: string;
+    groupName?: string;
+    tenderType?: string;
+    search?: string;
+  }): Promise<{ entries: any[]; total: number; totalPages: number }> {
+    return this.getBQCEntries(filters);
+  }
+
+  async getAdminExportData(filters: {
+    format: string;
+    startDate?: string;
+    endDate?: string;
+    groupName?: string;
+  }): Promise<string> {
+    return this.exportBQCData({
+      ...filters,
+      format: filters.format as 'csv' | 'excel'
+    });
   }
 
   // Admin statistics methods
@@ -490,6 +636,9 @@ class PostgresDatabase {
         b.evaluation_methodology,
         b.cec_estimate_incl_gst,
         b.cec_estimate_excl_gst,
+        b.lots,
+        b.annualized_value,
+        b.similar_work_definition,
         b.created_at,
         u.username,
         u.full_name
@@ -501,18 +650,50 @@ class PostgresDatabase {
     const rows = result.rows;
     
     if (filters.format === 'csv') {
-      // Convert to CSV
-      const csvHeader = 'ID,Ref Number,Group,Subject,Tender Description,Tender Type,Evaluation Methodology,CEC (Incl GST),CEC (Excl GST),Created At,Username,Full Name\n';
-      const csvRows = rows.map(row => 
-        `${row.id},"${row.ref_number}","${row.group_name}","${row.subject}","${row.tender_description}","${row.tender_type}","${row.evaluation_methodology}",${row.cec_estimate_incl_gst},${row.cec_estimate_excl_gst},"${row.created_at}","${row.username}","${row.full_name}"`
-      ).join('\n');
+      // Convert to CSV with lot-wise data
+      const csvHeader = 'ID,Ref Number,Group,Subject,Tender Description,Tender Type,Evaluation Methodology,CEC (Incl GST),CEC (Excl GST),Annualized Value,Similar Work Definition,Lot Data,Created At,Username,Full Name\n';
+      const csvRows = rows.map(row => {
+        // Parse lot data to extract individual lot information
+        let lotDataString = '';
+        try {
+          const lots = row.lots ? JSON.parse(row.lots) : [];
+          if (lots && lots.length > 0) {
+            const lotDetails = lots.map((lot: any, index: number) => {
+              return `Lot ${index + 1}: CEC=${lot.cecEstimateInclGst || 0}, EMD=${lot.emdAmount || 0}, Similar Work A=${lot.similarWorksOptionA || 0}, Similar Work B=${lot.similarWorksOptionB || 0}, Similar Work C=${lot.similarWorksOptionC || 0}, Contract Period=${lot.contractPeriodText || lot.contractPeriodMonths || 0} months`;
+            }).join('; ');
+            lotDataString = lotDetails;
+          } else {
+            lotDataString = 'No lots defined';
+          }
+        } catch (error) {
+          lotDataString = 'Error parsing lot data';
+        }
+        
+        return `${row.id},"${row.ref_number}","${row.group_name}","${row.subject}","${row.tender_description}","${row.tender_type}","${row.evaluation_methodology}",${row.cec_estimate_incl_gst},${row.cec_estimate_excl_gst},${row.annualized_value || 0},"${row.similar_work_definition || ''}","${lotDataString}","${row.created_at}","${row.username}","${row.full_name}"`;
+      }).join('\n');
       return csvHeader + csvRows;
     } else {
       // For Excel, we'll return CSV for now (you can implement proper Excel export later)
-      const csvHeader = 'ID,Ref Number,Group,Subject,Tender Description,Tender Type,Evaluation Methodology,CEC (Incl GST),CEC (Excl GST),Created At,Username,Full Name\n';
-      const csvRows = rows.map(row => 
-        `${row.id},"${row.ref_number}","${row.group_name}","${row.subject}","${row.tender_description}","${row.tender_type}","${row.evaluation_methodology}",${row.cec_estimate_incl_gst},${row.cec_estimate_excl_gst},"${row.created_at}","${row.username}","${row.full_name}"`
-      ).join('\n');
+      const csvHeader = 'ID,Ref Number,Group,Subject,Tender Description,Tender Type,Evaluation Methodology,CEC (Incl GST),CEC (Excl GST),Annualized Value,Similar Work Definition,Lot Data,Created At,Username,Full Name\n';
+      const csvRows = rows.map(row => {
+        // Parse lot data to extract individual lot information
+        let lotDataString = '';
+        try {
+          const lots = row.lots ? JSON.parse(row.lots) : [];
+          if (lots && lots.length > 0) {
+            const lotDetails = lots.map((lot: any, index: number) => {
+              return `Lot ${index + 1}: CEC=${lot.cecEstimateInclGst || 0}, EMD=${lot.emdAmount || 0}, Similar Work A=${lot.similarWorksOptionA || 0}, Similar Work B=${lot.similarWorksOptionB || 0}, Similar Work C=${lot.similarWorksOptionC || 0}, Contract Period=${lot.contractPeriodText || lot.contractPeriodMonths || 0} months`;
+            }).join('; ');
+            lotDataString = lotDetails;
+          } else {
+            lotDataString = 'No lots defined';
+          }
+        } catch (error) {
+          lotDataString = 'Error parsing lot data';
+        }
+        
+        return `${row.id},"${row.ref_number}","${row.group_name}","${row.subject}","${row.tender_description}","${row.tender_type}","${row.evaluation_methodology}",${row.cec_estimate_incl_gst},${row.cec_estimate_excl_gst},${row.annualized_value || 0},"${row.similar_work_definition || ''}","${lotDataString}","${row.created_at}","${row.username}","${row.full_name}"`;
+      }).join('\n');
       return csvHeader + csvRows;
     }
   }

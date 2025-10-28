@@ -161,78 +161,171 @@ export function PreambleSection({ data, onChange }: PreambleSectionProps) {
           </div>
         </div>
 
-        {/* CEC Estimates - Conditional Rendering */}
-        {data.evaluationMethodology === 'least cash outflow' ? (
-          /* least cash outflow - Single CEC Estimates */
-          <div className="bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 rounded-xl p-6">
-            <div className="flex items-center space-x-2 mb-4">
-              <h4 className="text-md font-semibold text-emerald-900">CEC Estimates (least cash outflow)</h4>
-              <Tooltip content="Contract Estimate Committee approved estimates for entire tender" position="right" />
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="form-group">
-                <label htmlFor="cecEstimateInclGst" className="form-label text-emerald-800">
-                  CEC Estimate (incl. GST) *
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    id="cecEstimateInclGst"
-                    className="form-input pr-16 border-emerald-200 focus:border-emerald-500 focus:ring-emerald-200"
-                    placeholder="0.00"
-                    step="0.01"
-                    min="0"
-                    value={data.cecEstimateInclGst || ''}
-                    onChange={(e) => onChange({ cecEstimateInclGst: parseFloat(e.target.value) || 0 })}
-                  />
-                  <span className="absolute inset-y-0 right-0 pr-4 flex items-center text-sm font-medium text-emerald-600">
-                    ₹ Crore
-                  </span>
-                </div>
-              </div>
+        {/* CEC Estimates - Always show LotWiseTable for AMC management */}
+        <LotWiseTable 
+          lots={data.lots || []}
+          onLotsChange={(lots) => onChange({ lots })}
+          tenderType={data.tenderType}
+          evaluationMethodology={data.evaluationMethodology}
+          globalCECInclGst={data.cecEstimateInclGst}
+          globalCECExclGst={data.cecEstimateExclGst}
+          onGlobalCECChange={(updates) => onChange(updates)}
+        />
 
-              <div className="form-group">
-                <label htmlFor="cecEstimateExclGst" className="form-label text-emerald-800">
-                  CEC Estimate (excl. GST) *
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    id="cecEstimateExclGst"
-                    className="form-input pr-16 border-emerald-200 focus:border-emerald-500 focus:ring-emerald-200"
-                    placeholder="0.00"
-                    step="0.01"
-                    min="0"
-                    value={data.cecEstimateExclGst || ''}
-                    onChange={(e) => onChange({ cecEstimateExclGst: parseFloat(e.target.value) || 0 })}
-                  />
-                  <span className="absolute inset-y-0 right-0 pr-4 flex items-center text-sm font-medium text-emerald-600">
-                    ₹ Crore
-                  </span>
+        {/* Proven Track Record Requirements - Only show for Lot-wise methodology */}
+        {data.evaluationMethodology === 'Lot-wise' && data.lots && data.lots.length > 0 && (
+          <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">
+            <div className="flex items-center space-x-2 mb-4">
+              <div className="h-8 w-8 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">📋</span>
+              </div>
+              <div>
+                <h4 className="text-lg font-semibold text-green-900">3.1.1 PROVEN TRACK RECORD</h4>
+                <p className="text-sm text-green-700">Similar works requirements based on lot-wise CEC estimates</p>
+              </div>
+            </div>
+
+            <div className="bg-white/60 rounded-lg border border-green-100 p-4 mb-4">
+              <p className="text-sm text-green-800 mb-3">
+                <strong>The bidder shall have experience of having successfully executed similar works in the last Seven (7) years in any Oil & Gas Industry in India.</strong> The Value (Rs) of the similar work/s executed (proof of execution to be submitted) should be as follows:
+              </p>
+              <p className="text-sm text-green-700 italic">
+                Note: Bidder can quote for any one or more than one LOT based on their capability/choice. If the Bidder quotes for more than one LOT, the similar works criteria should not be less than the cumulative amount applicable for the LOTs quoted.
+              </p>
+            </div>
+
+            {/* Lot-wise Requirements Table */}
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-green-200">
+                <thead className="bg-green-100">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-green-800 uppercase tracking-wider">
+                      Lot No.
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-green-800 uppercase tracking-wider">
+                      Description
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-green-800 uppercase tracking-wider">
+                      CEC Estimate (Incl. GST)
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-green-800 uppercase tracking-wider">
+                      Contract Period
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-green-800 uppercase tracking-wider">
+                      Annualized Value
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-green-800 uppercase tracking-wider">
+                      Option A (80%)
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-green-800 uppercase tracking-wider">
+                      Option B (50%)
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-green-800 uppercase tracking-wider">
+                      Option C (40%)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-green-200">
+                  {data.lots.map((lot, index) => {
+                    const cecInclGst = lot.cecEstimateInclGst || 0;
+                    const contractMonths = lot.contractPeriodMonths || 12;
+                    const contractYears = contractMonths / 12;
+                    const annualizedValue = contractYears > 1 ? cecInclGst / contractYears : cecInclGst;
+                    const finalAmount = lot.mseRelaxation ? annualizedValue * 0.85 : annualizedValue;
+                    const finalAmountInLakhs = finalAmount * 100; // Convert to Lakhs
+
+                    return (
+                      <tr key={lot.id} className="hover:bg-green-50">
+                        <td className="px-4 py-3 text-sm font-medium text-green-900">
+                          {lot.lotNumber}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-green-700">
+                          {lot.description || 'No description'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-center text-green-700">
+                          ₹ {cecInclGst.toFixed(2)} Crore
+                        </td>
+                        <td className="px-4 py-3 text-sm text-center text-green-700">
+                          {lot.contractPeriodText || `${contractMonths} months`}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-center text-green-700">
+                          ₹ {annualizedValue.toFixed(2)} Crore
+                        </td>
+                        <td className="px-4 py-3 text-sm text-center font-medium text-blue-700">
+                          ₹ {(finalAmountInLakhs * 0.8).toFixed(2)} Lakhs
+                        </td>
+                        <td className="px-4 py-3 text-sm text-center font-medium text-blue-700">
+                          ₹ {(finalAmountInLakhs * 0.5).toFixed(2)} Lakhs
+                        </td>
+                        <td className="px-4 py-3 text-sm text-center font-medium text-blue-700">
+                          ₹ {(finalAmountInLakhs * 0.4).toFixed(2)} Lakhs
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                {/* Cumulative Requirements Row */}
+                {data.lots.length > 1 && (
+                  <tfoot className="bg-green-100">
+                    <tr className="font-bold text-green-900">
+                      <td className="px-4 py-3 text-sm" colSpan={5}>
+                        Cumulative Requirements (All Lots)
+                      </td>
+                      <td className="px-4 py-3 text-sm text-center text-blue-800">
+                        ₹ {data.lots.reduce((sum, lot) => {
+                          const cecInclGst = lot.cecEstimateInclGst || 0;
+                          const contractMonths = lot.contractPeriodMonths || 12;
+                          const contractYears = contractMonths / 12;
+                          const annualizedValue = contractYears > 1 ? cecInclGst / contractYears : cecInclGst;
+                          const finalAmount = lot.mseRelaxation ? annualizedValue * 0.85 : annualizedValue;
+                          const finalAmountInLakhs = finalAmount * 100;
+                          return sum + (finalAmountInLakhs * 0.8);
+                        }, 0).toFixed(2)} Lakhs
+                      </td>
+                      <td className="px-4 py-3 text-sm text-center text-blue-800">
+                        ₹ {data.lots.reduce((sum, lot) => {
+                          const cecInclGst = lot.cecEstimateInclGst || 0;
+                          const contractMonths = lot.contractPeriodMonths || 12;
+                          const contractYears = contractMonths / 12;
+                          const annualizedValue = contractYears > 1 ? cecInclGst / contractYears : cecInclGst;
+                          const finalAmount = lot.mseRelaxation ? annualizedValue * 0.85 : annualizedValue;
+                          const finalAmountInLakhs = finalAmount * 100;
+                          return sum + (finalAmountInLakhs * 0.5);
+                        }, 0).toFixed(2)} Lakhs
+                      </td>
+                      <td className="px-4 py-3 text-sm text-center text-blue-800">
+                        ₹ {data.lots.reduce((sum, lot) => {
+                          const cecInclGst = lot.cecEstimateInclGst || 0;
+                          const contractMonths = lot.contractPeriodMonths || 12;
+                          const contractYears = contractMonths / 12;
+                          const annualizedValue = contractYears > 1 ? cecInclGst / contractYears : cecInclGst;
+                          const finalAmount = lot.mseRelaxation ? annualizedValue * 0.85 : annualizedValue;
+                          const finalAmountInLakhs = finalAmount * 100;
+                          return sum + (finalAmountInLakhs * 0.4);
+                        }, 0).toFixed(2)} Lakhs
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+
+            {/* Legend */}
+            <div className="mt-4 p-3 bg-white/60 rounded-lg border border-green-100">
+              <h5 className="text-sm font-semibold text-green-800 mb-2">Similar Works Options:</h5>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-green-700">
+                <div>
+                  <span className="font-medium text-blue-700">Option A:</span> One similar work of 80% value
+                </div>
+                <div>
+                  <span className="font-medium text-blue-700">Option B:</span> Two similar works each of 50% value
+                </div>
+                <div>
+                  <span className="font-medium text-blue-700">Option C:</span> Three similar works each of 40% value
                 </div>
               </div>
             </div>
-            
-            {/* GST Calculation Display */}
-            {data.cecEstimateInclGst && data.cecEstimateExclGst && (
-              <div className="mt-4 p-3 bg-white/60 rounded-lg border border-emerald-100">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-emerald-700 font-medium">GST Amount:</span>
-                  <span className="text-emerald-900 font-semibold">
-                    ₹ {(data.cecEstimateInclGst - data.cecEstimateExclGst).toFixed(2)} Crore
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
-        ) : (
-          /* Lot-wise - Table Format */
-          <LotWiseTable 
-            lots={data.lots || []}
-            onLotsChange={(lots) => onChange({ lots })}
-            tenderType={data.tenderType}
-          />
         )}
 
         {/* Enhanced CEC Date */}
@@ -249,6 +342,7 @@ export function PreambleSection({ data, onChange }: PreambleSectionProps) {
             onChange={(e) => onChange({ cecDate: e.target.value })}
           />
         </div>
+
 
         {/* Budget Details */}
         <div>

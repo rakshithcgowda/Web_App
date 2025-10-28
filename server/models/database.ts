@@ -408,12 +408,24 @@ class Database {
               } catch {
                 row.commercial_evaluation_method = [];
               }
+              
+              // Parse lots data
+              try {
+                row.lots = JSON.parse(row.lots || '[]');
+              } catch {
+                row.lots = [];
+              }
             }
             resolve(row);
           }
         }
       );
     });
+  }
+
+  // Alias method for compatibility with load API
+  async getBQCDataById(id: number, userId: number): Promise<any> {
+    return this.getBQCData(userId, id);
   }
 
   async listBQCData(userId: number): Promise<any[]> {
@@ -820,6 +832,9 @@ class Database {
           b.evaluation_methodology,
           b.cec_estimate_incl_gst,
           b.cec_estimate_excl_gst,
+          b.lots,
+          b.annualized_value,
+          b.similar_work_definition,
           b.created_at,
           u.username,
           u.full_name
@@ -852,18 +867,50 @@ class Database {
           reject(err);
         } else {
           if (filters.format === 'csv') {
-            // Convert to CSV
-            const csvHeader = 'ID,Ref Number,Group,Subject,Tender Description,Tender Type,Evaluation Methodology,CEC (Incl GST),CEC (Excl GST),Created At,Username,Full Name\n';
-            const csvRows = (rows || []).map(row => 
-              `${row.id},"${row.ref_number}","${row.group_name}","${row.subject}","${row.tender_description}","${row.tender_type}","${row.evaluation_methodology}",${row.cec_estimate_incl_gst},${row.cec_estimate_excl_gst},"${row.created_at}","${row.username}","${row.full_name}"`
-            ).join('\n');
+            // Convert to CSV with lot-wise data
+            const csvHeader = 'ID,Ref Number,Group,Subject,Tender Description,Tender Type,Evaluation Methodology,CEC (Incl GST),CEC (Excl GST),Annualized Value,Similar Work Definition,Lot Data,Created At,Username,Full Name\n';
+            const csvRows = (rows || []).map((row: any) => {
+              // Parse lot data to extract individual lot information
+              let lotDataString = '';
+              try {
+                const lots = row.lots ? JSON.parse(row.lots) : [];
+                if (lots && lots.length > 0) {
+                  const lotDetails = lots.map((lot: any, index: number) => {
+                    return `Lot ${index + 1}: CEC=${lot.cecEstimateInclGst || 0}, EMD=${lot.emdAmount || 0}, Similar Work A=${lot.similarWorksOptionA || 0}, Similar Work B=${lot.similarWorksOptionB || 0}, Similar Work C=${lot.similarWorksOptionC || 0}, Contract Period=${lot.contractPeriodText || lot.contractPeriodMonths || 0} months`;
+                  }).join('; ');
+                  lotDataString = lotDetails;
+                } else {
+                  lotDataString = 'No lots defined';
+                }
+              } catch (error) {
+                lotDataString = 'Error parsing lot data';
+              }
+              
+              return `${row.id},"${row.ref_number}","${row.group_name}","${row.subject}","${row.tender_description}","${row.tender_type}","${row.evaluation_methodology}",${row.cec_estimate_incl_gst},${row.cec_estimate_excl_gst},${row.annualized_value || 0},"${row.similar_work_definition || ''}","${lotDataString}","${row.created_at}","${row.username}","${row.full_name}"`;
+            }).join('\n');
             resolve(csvHeader + csvRows);
           } else {
             // For Excel, we'll return CSV for now (you can implement proper Excel export later)
-            const csvHeader = 'ID,Ref Number,Group,Subject,Tender Description,Tender Type,Evaluation Methodology,CEC (Incl GST),CEC (Excl GST),Created At,Username,Full Name\n';
-            const csvRows = (rows || []).map(row => 
-              `${row.id},"${row.ref_number}","${row.group_name}","${row.subject}","${row.tender_description}","${row.tender_type}","${row.evaluation_methodology}",${row.cec_estimate_incl_gst},${row.cec_estimate_excl_gst},"${row.created_at}","${row.username}","${row.full_name}"`
-            ).join('\n');
+            const csvHeader = 'ID,Ref Number,Group,Subject,Tender Description,Tender Type,Evaluation Methodology,CEC (Incl GST),CEC (Excl GST),Annualized Value,Similar Work Definition,Lot Data,Created At,Username,Full Name\n';
+            const csvRows = (rows || []).map((row: any) => {
+              // Parse lot data to extract individual lot information
+              let lotDataString = '';
+              try {
+                const lots = row.lots ? JSON.parse(row.lots) : [];
+                if (lots && lots.length > 0) {
+                  const lotDetails = lots.map((lot: any, index: number) => {
+                    return `Lot ${index + 1}: CEC=${lot.cecEstimateInclGst || 0}, EMD=${lot.emdAmount || 0}, Similar Work A=${lot.similarWorksOptionA || 0}, Similar Work B=${lot.similarWorksOptionB || 0}, Similar Work C=${lot.similarWorksOptionC || 0}, Contract Period=${lot.contractPeriodText || lot.contractPeriodMonths || 0} months`;
+                  }).join('; ');
+                  lotDataString = lotDetails;
+                } else {
+                  lotDataString = 'No lots defined';
+                }
+              } catch (error) {
+                lotDataString = 'Error parsing lot data';
+              }
+              
+              return `${row.id},"${row.ref_number}","${row.group_name}","${row.subject}","${row.tender_description}","${row.tender_type}","${row.evaluation_methodology}",${row.cec_estimate_incl_gst},${row.cec_estimate_excl_gst},${row.annualized_value || 0},"${row.similar_work_definition || ''}","${lotDataString}","${row.created_at}","${row.username}","${row.full_name}"`;
+            }).join('\n');
             resolve(csvHeader + csvRows);
           }
         }

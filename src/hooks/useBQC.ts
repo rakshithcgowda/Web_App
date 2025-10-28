@@ -36,16 +36,25 @@ export function useBQC() {
         if (oldMethodology === 'least cash outflow' && newMethodology === 'Lot-wise') {
           newData.cecEstimateInclGst = 0;
           newData.cecEstimateExclGst = 0;
-          newData.lots = newData.lots || [];
+          // Only initialize lots array if it doesn't exist, don't clear existing lots
+          if (!newData.lots || newData.lots.length === 0) {
+            newData.lots = [];
+          }
         }
         
         // If switching from Lot-wise to least cash outflow, clear lots array and ensure CEC values are set
         if (oldMethodology === 'Lot-wise' && newMethodology === 'least cash outflow') {
+          // Calculate total CEC from lots before clearing
+          const totalCECInclGst = newData.lots?.reduce((sum, lot) => sum + (lot.cecEstimateInclGst || 0), 0) || 0;
+          const totalCECExclGst = newData.lots?.reduce((sum, lot) => sum + (lot.cecEstimateExclGst || 0), 0) || 0;
+          
           newData.lots = [];
-          // Keep existing CEC values or set defaults
-          if (newData.cecEstimateInclGst === 0 && newData.cecEstimateExclGst === 0) {
-            newData.cecEstimateInclGst = 0;
-            newData.cecEstimateExclGst = 0;
+          // Set CEC values from lots total if they exist
+          if (totalCECInclGst > 0) {
+            newData.cecEstimateInclGst = totalCECInclGst;
+          }
+          if (totalCECExclGst > 0) {
+            newData.cecEstimateExclGst = totalCECExclGst;
           }
         }
       }
@@ -224,6 +233,15 @@ export function useBQC() {
       return { success: false, errors: validation.errors };
     }
 
+    // Additional validation: Check if CEC values are entered for lots
+    if (bqcData.evaluationMethodology === 'Lot-wise' && bqcData.lots && bqcData.lots.length > 0) {
+      const hasValidCECData = bqcData.lots.some(lot => (lot.cecEstimateInclGst || 0) > 0);
+      if (!hasValidCECData) {
+        setError('❌ Cannot generate document: No lots have CEC values greater than 0. Please go to the Preamble tab and enter CEC estimates (both including and excluding GST) for at least one lot. The generated document will show 0.00 values if CEC estimates are not entered.');
+        return { success: false, errors: [{ field: 'lots', message: 'CEC estimates required for lots' }] };
+      }
+    }
+
     setIsLoading(true);
     setError(null);
     
@@ -235,6 +253,43 @@ export function useBQC() {
         data: bqcData,
         format
       };
+
+      // Debug: Log the data being sent
+      console.log('=== FRONTEND DEBUG - Data being sent to backend ===');
+      console.log('BQC Data:', JSON.stringify(bqcData, null, 2));
+      if (bqcData.lots && bqcData.lots.length > 0) {
+        console.log('Lots data being sent:');
+        bqcData.lots.forEach((lot, index) => {
+          console.log(`  Lot ${index + 1}:`, {
+            lotNumber: lot.lotNumber,
+            cecEstimateInclGst: lot.cecEstimateInclGst,
+            cecEstimateExclGst: lot.cecEstimateExclGst,
+            contractPeriodText: lot.contractPeriodText,
+            contractPeriodMonths: lot.contractPeriodMonths,
+            hasAmc: lot.hasAmc,
+            amcValue: lot.amcValue,
+            mseRelaxation: lot.mseRelaxation,
+            // Debug pre-calculated values
+            similarWorksOptionA: lot.similarWorksOptionA,
+            similarWorksOptionB: lot.similarWorksOptionB,
+            similarWorksOptionC: lot.similarWorksOptionC
+          });
+          
+          // Check if CEC values are 0
+          if (lot.cecEstimateInclGst === 0) {
+            console.warn(`WARNING: Lot ${index + 1} has CEC Estimate = 0 in frontend data!`);
+          } else {
+            console.log(`✅ Lot ${index + 1} has CEC Estimate = ${lot.cecEstimateInclGst}`);
+          }
+        });
+      } else {
+        console.log('No lots data found!');
+      }
+      
+      // Additional debug: Check evaluation methodology
+      console.log('Evaluation Methodology:', bqcData.evaluationMethodology);
+      console.log('Contract Duration Years:', bqcData.contractDurationYears);
+      console.log('=== END FRONTEND DEBUG ===');
 
       const response = await bqcService.generateDocument(request);
       if (response.success && response.data) {

@@ -9,9 +9,9 @@ interface StatsOverviewProps {
 const StatsOverview: React.FC<StatsOverviewProps> = ({ stats, userStats }) => {
   const formatCurrency = (amount: number) => {
     if (amount >= 10000000) {
-      return `₹${(amount / 10000000).toFixed(2)} Cr`;
+      return `₹${Math.round((amount / 10000000) * 100) / 100} Cr`;
     } else if (amount >= 100000) {
-      return `₹${(amount / 100000).toFixed(2)} L`;
+      return `₹${Math.round((amount / 100000) * 100) / 100} L`;
     } else {
       return `₹${amount.toLocaleString()}`;
     }

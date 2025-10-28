@@ -1,7 +1,8 @@
 import type { BQCData } from '@/types';
 import { MANUFACTURER_TYPES, COMMERCIAL_EVALUATION_OPTIONS } from '@/utils/constants';
-import { formatCurrency, formatPercentage, formatTurnoverAmount } from '@/utils/calculations';
+import { formatCurrency, formatPercentage, formatTurnoverAmount, calculateBQCEMD, formatEMDAmount } from '@/utils/calculations';
 import { ExplanatoryNote } from '../ExplanatoryNote';
+import { useState } from 'react';
 
 interface BQCSectionProps {
   data: BQCData;
@@ -26,6 +27,8 @@ interface BQCSectionProps {
 }
 
 export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps) {
+  const [showMseCalculations, setShowMseCalculations] = useState(true);
+  const [showNonMseCalculations, setShowNonMseCalculations] = useState(true);
   const handleManufacturerTypeChange = (type: string, checked: boolean) => {
     const currentTypes = data.manufacturerTypes || [];
     let newTypes;
@@ -66,6 +69,7 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
           <p className="text-gray-600 mt-1">Define technical requirements and commercial evaluation methods</p>
         </div>
         <div className="card-body space-y-8">
+
         {/* Technical Criteria */}
         <div className="form-group">
           <h4 className="text-lg font-semibold text-gray-900 mb-6">Technical Criteria</h4>
@@ -113,10 +117,110 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
                   rows={3}
                   className="form-input"
                   placeholder="Define what constitutes similar work for this tender"
-                  value={data.similarWorkDefinition}
+                  value={data.similarWorkDefinition || 'Bidder should have executed the job of Pipeline Works for Hydrocarbons/Petrochemicals/ Fertilizers/Chemicals/ Fire Fighting system, with or without associated works.'}
                   onChange={(e) => onChange({ similarWorkDefinition: e.target.value })}
                 />
               </div>
+
+              {/* BQC/PQC for Procurement of Works and Services - Only for Lot-wise methodology */}
+              {data.evaluationMethodology === 'Lot-wise' && (
+                <div className="mb-6 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                  <h6 className="text-lg font-semibold text-blue-900 mb-2">3.1.2. BQC/PQC for Procurement of Works and Services</h6>
+                  <h6 className="text-lg font-semibold text-blue-900 mb-4">3.1.1 PROVEN TRACK RECORD</h6>
+                  <p className="text-sm text-blue-800 mb-4">
+                    The bidder shall have experience of having successfully executed similar works in the last Seven (7) years in any Oil & Gas Industry in India. The Value (Rs) of the similar work/s executed (proof of execution to be submitted) should be as follows:
+                  </p>
+                  
+                    {data.lots && data.lots.length > 0 ? (
+                    <div className="bg-white rounded-lg border border-blue-200 overflow-hidden">
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Sr. No.
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Section / Description
+                                  </th>
+                                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                One similar work of total value not less than (Rs. in Lakhs)
+                                  </th>
+                                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Two similar works EACH of value not less than (Rs. in Lakhs)
+                                  </th>
+                                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Three similar works EACH of value not less than (Rs. in Lakhs)
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {data.lots.map((lot, index) => {
+                                  const baseAmount = lot.cecEstimateInclGst || 0;
+                                  
+                                  // Parse contract period from text or use numeric value
+                                  let contractMonths = lot.contractPeriodMonths || 12;
+                                  if (lot.contractPeriodText) {
+                                    const textMatch = lot.contractPeriodText.match(/(\d+)/);
+                                    if (textMatch) {
+                                      contractMonths = parseInt(textMatch[1]);
+                                      // Handle years conversion
+                                      if (lot.contractPeriodText.toLowerCase().includes('year')) {
+                                        contractMonths = contractMonths * 12;
+                                      }
+                                    }
+                                  }
+                                  
+                                  const contractYears = contractMonths / 12;
+                                  const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+                                  const finalAmount = lot.mseRelaxation ? annualizedAmount * 0.85 : annualizedAmount;
+                                  
+                              // Convert to Lakhs for display (1 Crore = 100 Lakhs)
+                              const amountInLakhs = finalAmount * 100;
+                              
+                              const optionA = amountInLakhs * 0.8; // 80% - One work
+                              const optionB = amountInLakhs * 0.5; // 50% - Two works each
+                              const optionC = amountInLakhs * 0.4; // 40% - Three works each
+                                  
+                                  return (
+                                    <tr key={index} className="hover:bg-gray-50">
+                                      <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    {index + 1}
+                                  </td>
+                                  <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    {lot.lotNumber || `Lot ${index + 1}`}
+                                      </td>
+                                      <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                                    {Math.round(optionA * 100) / 100}
+                                      </td>
+                                      <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                                    {Math.round(optionB * 100) / 100}
+                                      </td>
+                                      <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                                    {Math.round(optionC * 100) / 100}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                        </div>
+                      </div>
+                    ) : (
+                    <div className="bg-white rounded-lg border border-blue-200 p-4">
+                      <p className="text-sm text-blue-700">
+                        Add lots in the Preamble tab to view proven track record requirements
+                      </p>
+                      </div>
+                    )}
+                  
+                  <div className="mt-4 p-3 bg-blue-100 rounded-lg">
+                    <p className="text-sm text-blue-800 font-medium">
+                      <strong>Note:</strong> Bidder can quote for any one or more than one LOT based on their capability/choice. If the Bidder quotes for more than one LOT, the similar works criteria should not be less than the cumulative amount applicable for the LOTs quoted.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* MSE Relaxation for Service/Works with least cash outflow */}
               {(data.tenderType === 'Service' || data.tenderType === 'Works') && data.evaluationMethodology === 'least cash outflow' && (
@@ -136,43 +240,105 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
                 </div>
               )}
 
-              {/* Experience Requirements Display */}
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h6 className="text-sm font-medium text-gray-900 mb-2">Experience Requirements:</h6>
-                <div className="space-y-1 text-sm text-blue-900">
-                  {(data.tenderType === 'Service' || data.tenderType === 'Works') && data.evaluationMethodology === 'least cash outflow' && data.mseRelaxation ? (
-                    /* Show both MSE and non-MSE values when MSE relaxation is enabled */
-                    <div className="space-y-3">
-                      {/* Non-MSE (Standard) Requirements */}
-                      <div className="bg-white p-3 rounded border border-blue-200">
-                        <h6 className="text-sm font-semibold text-gray-800 mb-2 block">Non-MSE Requirements:</h6>
-                        <div className="space-y-1">
-                          <p>Option A ({formatPercentage(calculatedValues.experienceRequirements.optionA.percentage)}): {formatCurrency(calculatedValues.experienceRequirements.optionA.value / 0.85)}</p>
-                          <p>Option B ({formatPercentage(calculatedValues.experienceRequirements.optionB.percentage)}): {formatCurrency(calculatedValues.experienceRequirements.optionB.value / 0.85)}</p>
-                          <p>Option C ({formatPercentage(calculatedValues.experienceRequirements.optionC.percentage)}): {formatCurrency(calculatedValues.experienceRequirements.optionC.value / 0.85)}</p>
-                        </div>
+              {/* Calculation Preview for Least Cash Outflow */}
+              {data.evaluationMethodology === 'least cash outflow' && (
+                <div className="mb-6 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                  <h6 className="text-lg font-semibold text-blue-900 mb-4">Similar Works Calculation</h6>
+                  
+                  {/* Base Information */}
+                  <div className="bg-white rounded-lg border border-blue-200 p-4 mb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Base Amount */}
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-600 mb-1">Base Amount</p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {formatCurrency(data.cecEstimateInclGst)}
+                        </p>
                       </div>
                       
-                      {/* MSE Relaxed Requirements */}
-                      <div className="bg-green-50 p-3 rounded border border-green-200">
-                        <h6 className="text-sm font-semibold text-green-800 mb-2 block">MSE Requirements (15% reduction):</h6>
-                        <div className="space-y-1">
-                          <p>Option A ({formatPercentage(calculatedValues.experienceRequirements.optionA.percentage)}): {formatCurrency(calculatedValues.experienceRequirements.optionA.value)}</p>
-                          <p>Option B ({formatPercentage(calculatedValues.experienceRequirements.optionB.percentage)}): {formatCurrency(calculatedValues.experienceRequirements.optionB.value)}</p>
-                          <p>Option C ({formatPercentage(calculatedValues.experienceRequirements.optionC.percentage)}): {formatCurrency(calculatedValues.experienceRequirements.optionC.value)}</p>
+                      {/* Contract Period */}
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-600 mb-1">Contract Period</p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {data.contractDurationYears || 1} year{(data.contractDurationYears || 1) !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4 text-center">
+                      <p className="text-sm text-gray-600 mb-1">Annualized Amount</p>
+                      <p className="text-xl font-semibold text-blue-900">
+                        {formatCurrency(data.cecEstimateInclGst / (data.contractDurationYears || 1))}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Non-MSE Calculations - Always show for least cash outflow */}
+                  <div className="bg-white rounded-lg border border-blue-200 overflow-hidden mb-4">
+                    <div className="bg-blue-50 px-4 py-2 border-b border-blue-200">
+                      <h6 className="text-sm font-semibold text-blue-900">Standard Requirements</h6>
+                    </div>
+                    <div className="p-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                          <span className="text-sm text-gray-600">One Similar Work (80%):</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {formatCurrency((data.cecEstimateInclGst / (data.contractDurationYears || 1)) * 0.8)}
+                          </span>
+                        </div>
+                        
+                        <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                          <span className="text-sm text-gray-600">Two Similar Works Each (50%):</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {formatCurrency((data.cecEstimateInclGst / (data.contractDurationYears || 1)) * 0.5)}
+                          </span>
+                        </div>
+                        
+                        <div className="flex justify-between items-center py-2">
+                          <span className="text-sm text-gray-600">Three Similar Works Each (40%):</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {formatCurrency((data.cecEstimateInclGst / (data.contractDurationYears || 1)) * 0.4)}
+                          </span>
                         </div>
                       </div>
                     </div>
-                  ) : (
-                    /* Show standard requirements when MSE relaxation is not enabled */
-                    <div className="space-y-1">
-                      <p>Option A ({formatPercentage(calculatedValues.experienceRequirements.optionA.percentage)}): {formatCurrency(calculatedValues.experienceRequirements.optionA.value)}</p>
-                      <p>Option B ({formatPercentage(calculatedValues.experienceRequirements.optionB.percentage)}): {formatCurrency(calculatedValues.experienceRequirements.optionB.value)}</p>
-                      <p>Option C ({formatPercentage(calculatedValues.experienceRequirements.optionC.percentage)}): {formatCurrency(calculatedValues.experienceRequirements.optionC.value)}</p>
+                  </div>
+
+                  {/* MSE Calculations - Only show when MSE relaxation is checked */}
+                  {data.mseRelaxation && (
+                    <div className="bg-white rounded-lg border border-green-200 overflow-hidden">
+                      <div className="bg-green-50 px-4 py-2 border-b border-green-200">
+                        <h6 className="text-sm font-semibold text-green-900">MSE Relaxation Calculations (15% Reduction)</h6>
+                      </div>
+                      <div className="p-4">
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                            <span className="text-sm text-gray-600">One Similar Work (80%):</span>
+                            <span className="text-sm font-medium text-green-700">
+                              {formatCurrency(((data.cecEstimateInclGst / (data.contractDurationYears || 1)) * 0.85) * 0.8)}
+                            </span>
+                          </div>
+                          
+                          <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                            <span className="text-sm text-gray-600">Two Similar Works Each (50%):</span>
+                            <span className="text-sm font-medium text-green-700">
+                              {formatCurrency(((data.cecEstimateInclGst / (data.contractDurationYears || 1)) * 0.85) * 0.5)}
+                            </span>
+                          </div>
+                          
+                          <div className="flex justify-between items-center py-2">
+                            <span className="text-sm text-gray-600">Three Similar Works Each (40%):</span>
+                            <span className="text-sm font-medium text-green-700">
+                              {formatCurrency(((data.cecEstimateInclGst / (data.contractDurationYears || 1)) * 0.85) * 0.4)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
-              </div>
+              )}
+
             </div>
           )}
 
@@ -186,6 +352,163 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
             placeholder="Add any additional information about experience requirements..."
           />
         </div>
+
+        {/* Past Performance Section for Goods */}
+        {data.tenderType === 'Goods' && (
+          <div className="form-group">
+            <h4 className="text-lg font-semibold text-gray-900 mb-6">Past Performance Requirements</h4>
+            
+            <div className="border border-gray-200 rounded-xl p-6 mb-6 bg-gradient-to-br from-purple-50 to-pink-50">
+              <h5 className="text-lg font-semibold text-gray-900 mb-4">Quantity Supplied Requirements</h5>
+              <p className="text-sm text-gray-700 mb-4">
+                The bidder should have supplied similar goods in the last Seven (7) years. The quantity supplied should be at least 30% of the total quantity required for each lot.
+              </p>
+              
+              {/* Toggle Controls */}
+              <div className="mb-4 p-4 bg-white rounded-lg border border-purple-200">
+                <h6 className="text-sm font-semibold text-purple-900 mb-3">Display Options</h6>
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="showNonMse"
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      checked={showNonMseCalculations}
+                      onChange={(e) => setShowNonMseCalculations(e.target.checked)}
+                    />
+                    <label htmlFor="showNonMse" className="ml-2 text-sm text-gray-700 font-medium">
+                      Show Non-MSE (30%)
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="showMse"
+                      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                      checked={showMseCalculations}
+                      onChange={(e) => setShowMseCalculations(e.target.checked)}
+                    />
+                    <label htmlFor="showMse" className="ml-2 text-sm text-gray-700 font-medium">
+                      Show MSE (25.5%)
+                    </label>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Toggle the visibility of MSE and Non-MSE calculations in the table below
+                </p>
+              </div>
+              
+              {data.evaluationMethodology === 'Lot-wise' && data.lots && data.lots.length > 0 ? (
+                <div className="bg-white rounded-lg border border-purple-200 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Sr. No.
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Section / Description
+                          </th>
+                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Quantity Required
+                          </th>
+                          {showNonMseCalculations && (
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Non-MSE (30%)
+                            </th>
+                          )}
+                          {showMseCalculations && (
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              MSE (25.5%)
+                            </th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {data.lots.map((lot, index) => {
+                          const quantityRequired = lot.quantitySupplied || 0;
+                          const nonMseRequirement = Math.round(quantityRequired * 0.3);
+                          const mseRequirement = Math.round(quantityRequired * 0.255); // 30% * (1 - 0.15) = 25.5%
+                          
+                          return (
+                            <tr key={index} className="hover:bg-gray-50">
+                              <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {index + 1}
+                              </td>
+                              <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {lot.lotNumber || `Lot ${index + 1}`}
+                              </td>
+                              <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                                {quantityRequired.toLocaleString()}
+                              </td>
+                              {showNonMseCalculations && (
+                                <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                                  {nonMseRequirement.toLocaleString()}
+                                </td>
+                              )}
+                              {showMseCalculations && (
+                                <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                                  {mseRequirement.toLocaleString()}
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                        
+                        {/* Total Row */}
+                        <tr className="bg-gray-50 font-semibold">
+                          <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {data.lots.length + 1}
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                            TOTAL FOR ALL LOTS
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                            {data.lots.reduce((total, lot) => total + (lot.quantitySupplied || 0), 0).toLocaleString()}
+                          </td>
+                          {showNonMseCalculations && (
+                            <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                              {Math.round(data.lots.reduce((total, lot) => total + ((lot.quantitySupplied || 0) * 0.3), 0)).toLocaleString()}
+                            </td>
+                          )}
+                          {showMseCalculations && (
+                            <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                              {Math.round(data.lots.reduce((total, lot) => total + ((lot.quantitySupplied || 0) * 0.255), 0)).toLocaleString()}
+                            </td>
+                          )}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white rounded-lg border border-purple-200 p-4">
+                  <p className="text-sm text-purple-700">
+                    Add lots with quantity information in the Preamble tab to view past performance requirements
+                  </p>
+                </div>
+              )}
+              
+              <div className="mt-4 p-3 bg-purple-100 rounded-lg">
+                <p className="text-sm text-purple-800 font-medium">
+                  <strong>Note:</strong> MSE (Micro and Small Enterprises) bidders get 15% relaxation on past performance requirements. 
+                  Non-MSE bidders need to show 30% of total quantity, while MSE bidders need to show 25.5% of total quantity.
+                </p>
+              </div>
+            </div>
+
+            {/* Explanatory Note for Past Performance */}
+            <ExplanatoryNote
+              label="Past Performance Requirements"
+              checked={data.hasPastPerformanceExplanatoryNote || false}
+              onCheckedChange={(checked) => onChange({ hasPastPerformanceExplanatoryNote: checked })}
+              value={data.pastPerformanceExplanatoryNote || ''}
+              onValueChange={(value) => onChange({ pastPerformanceExplanatoryNote: value })}
+              placeholder="Add any additional information about past performance requirements..."
+            />
+          </div>
+        )}
 
         {/* Commercial Evaluation Method */}
         <div>
@@ -218,7 +541,7 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
 
         {/* Financial Criteria */}
         <div>
-          <h4 className="text-md font-medium text-gray-900 mb-4">Financial Criteria</h4>
+          <h4 className="text-md font-medium text-gray-900 mb-4">3.2 FINANCIAL CRITERIA</h4>
           
           {/* Contract Duration for Calculation */}
           <div className="mb-4">
@@ -241,51 +564,165 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
             </p>
           </div>
           
-          {data.evaluationMethodology === 'least cash outflow' ? (
-            /* least cash outflow - Show calculated turnover */
-            <div className="bg-green-50 p-4 rounded-lg">
-              <h5 className="text-sm font-medium text-gray-900 mb-2">Annual Turnover Requirement</h5>
-              <p className="text-lg font-semibold text-green-900">
-                {calculatedValues.turnoverRequirement.description}: {formatTurnoverAmount(calculatedValues.turnoverRequirement.amount)}
+          {/* Annual Turnover Section - Only for Lot-wise */}
+          {data.evaluationMethodology === 'Lot-wise' && (
+            <div className="mb-6 p-4 bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg">
+              <h6 className="text-lg font-semibold text-green-900 mb-4">3.2.1 ANNUAL TURNOVER</h6>
+              <p className="text-sm text-green-800 mb-4">
+                The bidder should have achieved a minimum Average Annual financial turnover as per below table (LOT-WISE) as per Audited Balance sheet and P&L Statement in the last three* accounting years prior to due date of bid submission.
               </p>
-            </div>
-          ) : (
-            /* Lot-wise - Show reference to Preamble table */
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
-              <div className="flex items-center space-x-2 mb-4">
-                <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <h5 className="text-md font-semibold text-blue-900">Lot-wise Financial Criteria</h5>
-              </div>
               
-              <div className="space-y-3">
-                <p className="text-sm text-blue-800 font-medium">
-                  📊 For lot-wise evaluation, financial criteria are calculated individually for each lot.
-                </p>
-                
-                <div className="bg-white/60 rounded-lg border border-blue-100 p-4">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <svg className="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p className="text-sm font-semibold text-blue-900">
-                      Check the Preamble → Lot-wise Table for:
-                    </p>
+              {data.lots && data.lots.length > 0 ? (
+                <div className="bg-white rounded-lg border border-green-200 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Sr. No.
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Section / Description
+                          </th>
+                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Annualized Estimated Value (Rs. In Lakhs)
+                          </th>
+                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Average Annual Turnover (Rs. In Lakhs)
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {data.lots.map((lot, index) => {
+                          const baseAmount = lot.cecEstimateInclGst || 0;
+                          
+                          // Parse contract period from text or use numeric value
+                          let contractMonths = lot.contractPeriodMonths || 12;
+                          if (lot.contractPeriodText) {
+                            const textMatch = lot.contractPeriodText.match(/(\d+)/);
+                            if (textMatch) {
+                              contractMonths = parseInt(textMatch[1]);
+                              // Handle years conversion
+                              if (lot.contractPeriodText.toLowerCase().includes('year')) {
+                                contractMonths = contractMonths * 12;
+                              }
+                            }
+                          }
+                          
+                          const contractYears = contractMonths / 12;
+                          const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+                          
+                          // Convert to Lakhs for display (1 Crore = 100 Lakhs)
+                          const annualizedValueInLakhs = annualizedAmount * 100;
+                          
+                          // Calculate turnover requirement (30% of annualized value)
+                          const turnoverRequirement = annualizedValueInLakhs * 0.3;
+                          
+                          return (
+                            <tr key={index} className="hover:bg-gray-50">
+                              <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {index + 1}
+                              </td>
+                              <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {lot.lotNumber || `Lot ${index + 1}`}
+                              </td>
+                              <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                                {Math.round(annualizedValueInLakhs * 100) / 100}
+                              </td>
+                              <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                                {Math.round(turnoverRequirement * 100) / 100}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        
+                        {/* Total Row */}
+                        <tr className="bg-gray-50 font-semibold">
+                          <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {data.lots.length + 1}
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                            TOTAL FOR ALL LOTS
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                            {Math.round(data.lots.reduce((total, lot) => {
+                              const baseAmount = lot.cecEstimateInclGst || 0;
+                              let contractMonths = lot.contractPeriodMonths || 12;
+                              if (lot.contractPeriodText) {
+                                const textMatch = lot.contractPeriodText.match(/(\d+)/);
+                                if (textMatch) {
+                                  contractMonths = parseInt(textMatch[1]);
+                                  if (lot.contractPeriodText.toLowerCase().includes('year')) {
+                                    contractMonths = contractMonths * 12;
+                                  }
+                                }
+                              }
+                              const contractYears = contractMonths / 12;
+                              const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+                              return total + (annualizedAmount * 100);
+                            }, 0) * 100) / 100}
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                            {Math.round(data.lots.reduce((total, lot) => {
+                              const baseAmount = lot.cecEstimateInclGst || 0;
+                              let contractMonths = lot.contractPeriodMonths || 12;
+                              if (lot.contractPeriodText) {
+                                const textMatch = lot.contractPeriodText.match(/(\d+)/);
+                                if (textMatch) {
+                                  contractMonths = parseInt(textMatch[1]);
+                                  if (lot.contractPeriodText.toLowerCase().includes('year')) {
+                                    contractMonths = contractMonths * 12;
+                                  }
+                                }
+                              }
+                              const contractYears = contractMonths / 12;
+                              const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+                              const turnoverRequirement = (annualizedAmount * 100) * 0.3;
+                              return total + turnoverRequirement;
+                            }, 0) * 100) / 100}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
-                  {/* <ul className="text-sm text-blue-700 space-y-1 ml-6">
-                    <li>• <strong>Turnover Requirement:</strong> 30% of each lot's CEC (excluding AMC)</li>
-                    <li>• <strong>Individual calculations</strong> displayed in the "Turnover" column</li>
-                    <li>• <strong>AMC considerations</strong> applied per lot when applicable</li>
-                  </ul> */}
                 </div>
-                
-                <p className="text-xs text-blue-600 italic">
-                  💡 Navigate to Preamble tab to view and manage individual lot financial criteria.
+              ) : (
+                <div className="bg-white rounded-lg border border-green-200 p-4">
+                  <p className="text-sm text-green-700">
+                    Add lots in the Preamble tab to view annual turnover requirements
+                  </p>
+                </div>
+              )}
+              
+              <div className="mt-4 p-3 bg-green-100 rounded-lg">
+                <p className="text-sm text-green-800 font-medium">
+                  <strong>Note:</strong> Bidder can quote for any one or more than one LOT based on their capability/choice. If the Bidder quotes for more than one LOT, the average value of Turnover should not be less than the cumulative amount applicable for the LOTs quoted.
                 </p>
               </div>
             </div>
           )}
+          
+          {data.evaluationMethodology === 'least cash outflow' && (
+            /* least cash outflow - Show calculated turnover with separate MSE sections */
+            <div className="bg-green-50 p-4 rounded-lg">
+              <h5 className="text-sm font-medium text-gray-900 mb-2">Annual Turnover Requirement</h5>
+              <p className="text-lg font-semibold text-green-900 mb-3">
+                {calculatedValues.turnoverRequirement.description}: {formatTurnoverAmount(calculatedValues.turnoverRequirement.amount)}
+              </p>
+              
+            </div>
+          )}
+
+          {/* Net Worth Section */}
+          <div className="mb-6 p-4 bg-gradient-to-br from-orange-50 to-red-50 border border-orange-200 rounded-lg">
+            <h6 className="text-lg font-semibold text-orange-900 mb-4">3.2.2 NET WORTH</h6>
+            <p className="text-sm text-orange-800 mb-4">
+              The bidder should have positive net worth as per the latest audited financial statement.
+            </p>
+          </div>
+
+
+
         </div>
 
         {/* Explanatory Note for Financial Criteria */}

@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { database } from '../../server/models/database-adapter.js';
-import { authenticateTokenVercel } from '../../server/middleware/auth.js';
+import { database } from '../../server/models/database-adapter';
+import { authenticateTokenVercel } from '../../server/middleware/auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers
@@ -31,19 +31,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const { format = 'csv', startDate = '', endDate = '' } = req.query;
+    // Check if user is admin (username: admin)
+    const adminUser = await database.getUserById(authResult.userId!);
+    if (!adminUser || adminUser.username !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
+    const { format = 'csv', startDate = '', endDate = '', groupName = '' } = req.query;
 
     // Get export data
-    const exportData = await database.getAdminExportData({
-      format: format as string,
+    const exportData = await database.exportBQCData({
+      format: format as 'csv' | 'excel',
       startDate: startDate as string,
-      endDate: endDate as string
+      endDate: endDate as string,
+      groupName: groupName as string
     });
 
-    res.json({
-      success: true,
-      data: exportData
-    });
+    // Set appropriate headers for file download
+    const filename = `bqc-data-${new Date().toISOString().split('T')[0]}.${format}`;
+    res.setHeader('Content-Type', format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    
+    res.send(exportData);
   } catch (error) {
     console.error('Admin export error:', error);
     res.status(500).json({

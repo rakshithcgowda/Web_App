@@ -1,4 +1,4 @@
-import type { ApiResponse } from '@/types';
+import type { ApiResponse, User } from '@/types';
 import { API_ENDPOINTS } from '@/utils/constants';
 import { authService } from './auth';
 
@@ -283,6 +283,33 @@ class AdminService {
     } catch (error) {
       console.error('Export error:', error);
       throw new Error('Failed to export data');
+    }
+  }
+
+  async getUserManagement(): Promise<ApiResponse<User[]>> {
+    try {
+      const response = await this.makeAuthenticatedRequest(API_ENDPOINTS.ADMIN.USERS);
+      return await response.json();
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Network error occurred. Please try again.',
+      };
+    }
+  }
+
+  async manageUser(userId: number, action: 'approve' | 'reject'): Promise<ApiResponse> {
+    try {
+      const response = await this.makeAuthenticatedRequest(API_ENDPOINTS.ADMIN.USERS, {
+        method: 'POST',
+        body: JSON.stringify({ userId, action })
+      });
+      return await response.json();
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Network error occurred. Please try again.',
+      };
     }
   }
 }

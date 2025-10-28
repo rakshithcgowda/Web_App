@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { database } from '../../server/models/database-adapter';
-import { authenticateTokenVercel } from '../../server/middleware/auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers
@@ -22,37 +21,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Authenticate token
-    const authResult = await authenticateTokenVercel(req);
-    if (!authResult.success) {
-      return res.status(401).json({
-        success: false,
-        message: 'Unauthorized'
-      });
-    }
-
-    const user = await database.getUserById(authResult.userId!);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
+    // Get basic database stats
+    const userStats = await database.getUserStats();
+    const bqcStats = await database.getBQCStats();
+    
     res.json({
       success: true,
       data: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        fullName: user.full_name
+        users: userStats,
+        bqc: bqcStats,
+        timestamp: new Date().toISOString()
       }
     });
   } catch (error) {
-    console.error('Get user error:', error);
+    console.error('Database status error:', error);
     res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: 'Database error',
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 }

@@ -3,6 +3,7 @@ import { database } from '../models/database-adapter.js';
 import { authenticateToken, AuthRequest } from '../middleware/auth.js';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType } from 'docx';
 import { convertHtmlToWordRuns } from '../utils/htmlToWord.js';
+import { BQCData, LotData } from '../types.js';
 
 const router = express.Router();
 
@@ -73,12 +74,13 @@ router.get('/load/:id', async (req: AuthRequest, res) => {
       cecEstimateInclGst: bqcData.cec_estimate_incl_gst,
       cecDate: bqcData.cec_date,
       cecEstimateExclGst: bqcData.cec_estimate_excl_gst,
-      lots: bqcData.lots ? JSON.parse(bqcData.lots) : [],
+      lots: bqcData.lots || [],
       quantitySupplied: bqcData.quantity_supplied,
       budgetDetails: bqcData.budget_details,
       tenderPlatform: bqcData.tender_platform,
       scopeOfWork: bqcData.scope_of_work,
       contractPeriodMonths: bqcData.contract_period_months,
+      contractDurationYears: bqcData.contract_duration_years || 1,
       deliveryPeriod: bqcData.delivery_period || '',
       warrantyPeriod: bqcData.warranty_period || '',
       amcPeriod: bqcData.amc_period || '',
@@ -215,63 +217,66 @@ router.post('/generate', async (req: AuthRequest, res) => {
       return Math.round(quantitySupplied * basePercentage);
     };
 
-    const calculateEMD = (estimatedValue: number, tenderType: string) => {
-      if (tenderType === 'Goods') {
-        // Goods: 0.5-1.0 Cr = Nil, >1.0 Cr = progressive rates
-        if (estimatedValue >= 0.5 && estimatedValue <= 1.0) {
-          return 0; // Nil
-        } else if (estimatedValue > 1.0 && estimatedValue <= 5.0) {
-          return 2.5; // 2.5 Lakhs
-        } else if (estimatedValue > 5.0 && estimatedValue <= 10.0) {
-          return 5; // 5 Lakhs
-        } else if (estimatedValue > 10.0 && estimatedValue <= 15.0) {
-          return 7.5; // 7.5 Lakhs
-        } else if (estimatedValue > 15.0 && estimatedValue <= 25.0) {
-          return 10; // 10 Lakhs
-        } else if (estimatedValue > 25.0) {
-          return 20; // 20 Lakhs
+      const calculateEMD = (estimatedValue: number, tenderType: string) => {
+        // Convert Cr to Lakhs for calculation (1 Cr = 100 Lakhs)
+        const valueInLakhs = estimatedValue * 100;
+        
+        if (tenderType === 'Goods') {
+          // Goods: 50L-100L = Nil, >100L = fixed amounts
+          if (valueInLakhs >= 50 && valueInLakhs <= 100) {
+            return 0; // Nil
+          } else if (valueInLakhs > 100 && valueInLakhs <= 500) {
+            return 2.5; // 2.5 Lakhs
+          } else if (valueInLakhs > 500 && valueInLakhs <= 1000) {
+            return 5; // 5 Lakhs
+          } else if (valueInLakhs > 1000 && valueInLakhs <= 1500) {
+            return 7.5; // 7.5 Lakhs
+          } else if (valueInLakhs > 1500 && valueInLakhs <= 2500) {
+            return 10; // 10 Lakhs
+          } else if (valueInLakhs > 2500) {
+            return 20; // 20 Lakhs
+          }
+          return 0; // For values < 50L
         }
-        return 0;
-      }
-      
-      if (tenderType === 'Service') {
-        // Services: 0.5-1.0 Cr = 1L, >1.0 Cr = progressive rates
-        if (estimatedValue >= 0.5 && estimatedValue <= 1.0) {
-          return 1; // 1 Lakh
-        } else if (estimatedValue > 1.0 && estimatedValue <= 5.0) {
-          return 2.5; // 2.5 Lakhs
-        } else if (estimatedValue > 5.0 && estimatedValue <= 10.0) {
-          return 5; // 5 Lakhs
-        } else if (estimatedValue > 10.0 && estimatedValue <= 15.0) {
-          return 7.5; // 7.5 Lakhs
-        } else if (estimatedValue > 15.0 && estimatedValue <= 25.0) {
-          return 10; // 10 Lakhs
-        } else if (estimatedValue > 25.0) {
-          return 20; // 20 Lakhs
+        
+        if (tenderType === 'Service') {
+          // Service: 50L-100L = 1L (inclusive), >100L = fixed amounts
+          if (valueInLakhs >= 50 && valueInLakhs <= 100) {
+            return 1; // 1 Lakh
+          } else if (valueInLakhs > 100 && valueInLakhs <= 500) {
+            return 2.5; // 2.5 Lakhs
+          } else if (valueInLakhs > 500 && valueInLakhs <= 1000) {
+            return 5; // 5 Lakhs
+          } else if (valueInLakhs > 1000 && valueInLakhs <= 1500) {
+            return 7.5; // 7.5 Lakhs
+          } else if (valueInLakhs > 1500 && valueInLakhs <= 2500) {
+            return 10; // 10 Lakhs
+          } else if (valueInLakhs > 2500) {
+            return 20; // 20 Lakhs
+          }
+          return 0; // For values < 50L
         }
-        return 0; // For values < 0.5 Cr
-      }
-      
-      if (tenderType === 'Works') {
-        // Works: 0.5-1.0 Cr = 1L, >1.0 Cr = progressive rates
-        if (estimatedValue >= 0.5 && estimatedValue <= 1.0) {
-          return 1; // 1 Lakh
-        } else if (estimatedValue > 1.0 && estimatedValue <= 5.0) {
-          return 2.5; // 2.5 Lakhs
-        } else if (estimatedValue > 5.0 && estimatedValue <= 10.0) {
-          return 5; // 5 Lakhs
-        } else if (estimatedValue > 10.0 && estimatedValue <= 15.0) {
-          return 7.5; // 7.5 Lakhs
-        } else if (estimatedValue > 15.0 && estimatedValue <= 25.0) {
-          return 10; // 10 Lakhs
-        } else if (estimatedValue > 25.0) {
-          return 20; // 20 Lakhs
+        
+        if (tenderType === 'Works') {
+          // Works: 50L-100L = 1L (inclusive), >100L = fixed amounts
+          if (valueInLakhs >= 50 && valueInLakhs <= 100) {
+            return 1; // 1 Lakh
+          } else if (valueInLakhs > 100 && valueInLakhs <= 500) {
+            return 2.5; // 2.5 Lakhs
+          } else if (valueInLakhs > 500 && valueInLakhs <= 1000) {
+            return 5; // 5 Lakhs
+          } else if (valueInLakhs > 1000 && valueInLakhs <= 1500) {
+            return 7.5; // 7.5 Lakhs
+          } else if (valueInLakhs > 1500 && valueInLakhs <= 2500) {
+            return 10; // 10 Lakhs
+          } else if (valueInLakhs > 2500) {
+            return 20; // 20 Lakhs
+          }
+          return 0; // For values < 50L
         }
-        return 0; // For values < 0.5 Cr
-      }
-      
-      return 0; // Default case
-    };
+        
+        return 0; // Default case
+      };
 
     const calculateTurnover = (data: {
       divisibility?: string;
@@ -283,6 +288,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
       hasAmc?: boolean;
       amcValue?: number;
       contractPeriodMonths?: number;
+      contractDurationYears?: number;
     }) => {
       let basePercentage = 0.3;
       if (data.divisibility === 'Divisible') {
@@ -308,40 +314,14 @@ router.post('/generate', async (req: AuthRequest, res) => {
       // Calculate turnover requirement
       const turnoverAmount = basePercentage * baseAmount;
       
-      // Apply annualization for all tender types if contract duration > 1 year
-      const contractDurationYears = (data as any).contractDurationYears || 1;
+      // Always apply annualization based on contract duration (divide by contract period)
+      const contractDurationYears = data.contractDurationYears || 1;
       
-      if (contractDurationYears > 1) {
         return turnoverAmount / contractDurationYears;
-      }
-      
-      // For other cases, return the full amount (no annualization)
-      return turnoverAmount;
     };
 
-    const extractContractYears = (contractPeriod: string): number => {
-      if (!contractPeriod) return 1; // Default to 1 year if not specified
-      
-      // Extract numbers from the contract period string
-      const match = contractPeriod.match(/(\d+(?:\.\d+)?)/);
-      if (!match) return 1;
-      
-      const number = parseFloat(match[1]);
-      
-      // Convert to years based on common patterns
-      if (contractPeriod.toLowerCase().includes('year')) {
-        return number;
-      } else if (contractPeriod.toLowerCase().includes('month')) {
-        return number / 12;
-      } else if (contractPeriod.toLowerCase().includes('day')) {
-        return number / 365;
-      }
-      
-      // If no unit specified, assume years
-      return number;
-    };
 
-    const calculateExperienceRequirements = (data: any) => {
+    const calculateExperienceRequirements = (data: BQCData) => {
       // Apply correction factor if divisible
       let optionAPercent = 0.4;
       let optionBPercent = 0.5;
@@ -357,7 +337,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
       // Get total CEC values (handles both least cash outflow and lot-wise)
       let totalCECInclGst = 0;
       if (data.lots && data.lots.length > 0) {
-        totalCECInclGst = data.lots.reduce((sum: number, lot: any) => sum + (lot.cecEstimateInclGst || 0), 0);
+        totalCECInclGst = data.lots.reduce((sum: number, lot: LotData) => sum + (lot.cecEstimateInclGst || 0), 0);
       } else {
         totalCECInclGst = data.cecEstimateInclGst || 0;
       }
@@ -408,19 +388,10 @@ router.post('/generate', async (req: AuthRequest, res) => {
       };
     };
 
-    const formatCurrency = (amount: number): string => {
-      if (amount >= 10000000) {
-        return `Rs. ${(amount / 10000000).toFixed(2)} Crore`;
-      } else if (amount >= 100000) {
-        return `Rs. ${(amount / 100000).toFixed(2)} Lacs`;
-      } else {
-        return `Rs. ${amount.toLocaleString()}`;
-      }
-    };
 
     const formatTurnoverAmount = (amountInCrores: number): string => {
-      // Always display in Crores format
-      return `Rs. ${amountInCrores.toFixed(2)} Crore`;
+      // Always display in Crores format, rounded to 2 decimal places
+      return `Rs. ${Math.round(amountInCrores * 100) / 100} Crore`;
     };
 
     // Calculate dynamic section numbers based on document structure
@@ -522,7 +493,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
 
     // Format experience requirements in Crores
     const formatExperienceCurrency = (amount: number): string => {
-      return `Rs. ${amount.toFixed(3)} Crore`;
+      return `Rs. ${Math.round(amount * 100) / 100} Crore`;
     };
 
     // Calculate values based on methodology
@@ -552,14 +523,14 @@ router.post('/generate', async (req: AuthRequest, res) => {
     } else {
       // Lot-wise methodology - calculate from lots
       if (bqcData.lots && bqcData.lots.length > 0) {
-        totalCECInclGst = bqcData.lots.reduce((sum: number, lot: any) => sum + (lot.cecEstimateInclGst || 0), 0);
-        totalCECExclGst = bqcData.lots.reduce((sum: number, lot: any) => sum + (lot.cecEstimateExclGst || 0), 0);
+        totalCECInclGst = bqcData.lots.reduce((sum: number, lot: LotData) => sum + (lot.cecEstimateInclGst || 0), 0);
+        totalCECExclGst = bqcData.lots.reduce((sum: number, lot: LotData) => sum + (lot.cecEstimateExclGst || 0), 0);
         
         // Only calculate past performance for Goods tender type
         if (bqcData.tenderType === 'Goods') {
-          pastPerformanceNonMSE = bqcData.lots.reduce((sum: number, lot: any) => 
+          pastPerformanceNonMSE = bqcData.lots.reduce((sum: number, lot: LotData) => 
             sum + calculatePastPerformance(lot.quantitySupplied || 0, false), 0);
-          pastPerformanceMSE = bqcData.lots.reduce((sum: number, lot: any) => 
+          pastPerformanceMSE = bqcData.lots.reduce((sum: number, lot: LotData) => 
             sum + calculatePastPerformance(lot.quantitySupplied || 0, lot.mseRelaxation || false), 0);
         }
         
@@ -1254,7 +1225,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                       new Paragraph({
                         children: [
                           new TextRun({ 
-                            text: `${bqcData.contractPeriodMonths || 12} months`, 
+                            text: bqcData.contractPeriodText || `${bqcData.contractPeriodMonths || 12} months`, 
                             size: 24,
                             font: "Arial"
                           }),
@@ -1557,7 +1528,6 @@ router.post('/generate', async (req: AuthRequest, res) => {
                   ],
                   spacing: { after: 200 },
                 }),
-              ] : []),
               
               new Paragraph({
                 children: [
@@ -1569,7 +1539,10 @@ router.post('/generate', async (req: AuthRequest, res) => {
                 ],
                 spacing: { after: 200 },
               }),
-              
+            ] : []),
+          ] : []),
+          ] : []),
+          
           // Explanatory Note for Past Performance Requirement
           ...(bqcData.hasPastPerformanceExplanatoryNote && bqcData.pastPerformanceExplanatoryNote ? [
             new Paragraph({
@@ -1577,12 +1550,9 @@ router.post('/generate', async (req: AuthRequest, res) => {
               spacing: { after: 200 },
             }),
           ] : []),
-            ] : []),
-            
-          ] : []),
           
           // Service/Works content
-          ...(bqcData.tenderType === 'Service' || bqcData.tenderType === 'Works' ? [
+          ...((bqcData.tenderType === 'Service' || bqcData.tenderType === 'Works') ? [
                       new Paragraph({
                         children: [
                           new TextRun({ 
@@ -1595,249 +1565,201 @@ router.post('/generate', async (req: AuthRequest, res) => {
               spacing: { after: 200 },
             }),
             
-            new Paragraph({
-              children: [
-                new TextRun({ 
-                  text: "Experience / Past performance / Technical Capability:", 
-                  bold: true, 
-                  size: 24,
-                  font: "Arial"
+            // Experience / Past performance / Technical Capability section - only for non-lot-wise methodology
+            ...(bqcData.evaluationMethodology !== 'Lot-wise' ? [
+              new Paragraph({
+                children: [
+                  new TextRun({ 
+                    text: "Experience / Past performance / Technical Capability:", 
+                    bold: true, 
+                    size: 24,
+                    font: "Arial"
+                  }),
+                ],
+                spacing: { after: 100 },
+              }),
+              
+              new Paragraph({
+                children: [
+                  new TextRun({ 
+                    text: "The bidder should have experience of having successfully completed similar works during last 7 years ending last day of month previous to the one in which tender is floated should be either of the following: -", 
+                    size: 24,
+                    font: "Arial"
+                  }),
+                ],
+                spacing: { after: 200 },
+              }),
+              
+              // Experience Requirements - Dynamic based on methodology and MSE relaxation
+              // Only show for Lot-wise OR for least cash outflow when MSE relaxation is checked
+              ...((bqcData.tenderType === 'Service' || bqcData.tenderType === 'Works') && 
+                  (bqcData.evaluationMethodology === 'Lot-wise' || bqcData.mseRelaxation) ? [
+                new Paragraph({
+                  children: [
+                    new TextRun({ 
+                      text: "Experience Requirements:", 
+                      bold: true,
+                      size: 24,
+                      font: "Arial"
+                    }),
+                  ],
+                  spacing: { after: 200 },
+                }),
+                
+                // Show standard requirements first (only for least cash outflow when MSE is enabled)
+                ...(bqcData.evaluationMethodology === 'least cash outflow' && bqcData.mseRelaxation ? [
+                  // Standard Requirements (reverse of MSE adjustment: divide by 0.85)
+                  new Paragraph({
+                    children: [
+                      new TextRun({ 
+                        text: "Standard Requirements:", 
+                        bold: true,
+                        size: 24,
+                        font: "Arial"
                       }),
                     ],
-              spacing: { after: 100 },
+                    spacing: { after: 100 },
                   }),
-            
-                      new Paragraph({
-                        children: [
-                          new TextRun({ 
-                  text: "The bidder should have experience of having successfully completed similar works during last 7 years ending last day of month previous to the one in which tender is floated should be either of the following: -", 
-                            size: 24,
-                            font: "Arial"
-                          }),
-                        ],
-              spacing: { after: 200 },
-            }),
-            
-            // Experience Requirements - Dynamic based on MSE relaxation
-            ...((bqcData.tenderType === 'Service' || bqcData.tenderType === 'Works') && bqcData.evaluationMethodology === 'least cash outflow' && bqcData.mseRelaxation ? [
-              // Show both Non-MSE and MSE values when MSE relaxation is enabled
-              new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: "Experience Requirements:", 
-                    bold: true,
-                    size: 24,
-                    font: "Arial"
-                  }),
-                ],
-                spacing: { after: 200 },
-              }),
-              
-              // Non-MSE (Standard) Requirements
-              new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: "Non-MSE (Standard) Requirements:", 
-                    bold: true,
-                    size: 24,
-                    font: "Arial"
-                  }),
-                ],
-                spacing: { after: 100 },
-              }),
-              
-              new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: `Three similar completed works each costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionA.value / 0.85 : 0)}.`, 
-                    size: 24,
-                    font: "Arial"
-                  }),
-                ],
-                spacing: { after: 100 },
-              }),
-              
-              new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: "or", 
-                    size: 24,
-                    font: "Arial"
-                  }),
-                ],
-                spacing: { after: 100 },
-              }),
-              
-              new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: `Two similar completed works each costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionB.value / 0.85 : 0)}.`, 
-                    size: 24,
-                    font: "Arial"
-                  }),
-                ],
-                spacing: { after: 100 },
-              }),
-              
-              new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: "or", 
-                    size: 24,
-                    font: "Arial"
-                  }),
-                ],
-                spacing: { after: 100 },
-              }),
-              
-              new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: `One similar completed work costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionC.value / 0.85 : 0)}.`, 
-                    size: 24,
-                    font: "Arial"
-                  }),
-                ],
-                spacing: { after: 200 },
-              }),
-              
-              // MSE Relaxed Requirements
-              new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: "MSE Relaxed Requirements (15% reduction):", 
-                    bold: true,
-                    size: 24,
-                    font: "Arial"
-                  }),
-                ],
-                spacing: { after: 100 },
-              }),
-              
-              new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: `Three similar completed works each costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionA.value : 0)}.`, 
-                    size: 24,
-                    font: "Arial"
-                  }),
-                ],
-                spacing: { after: 100 },
-              }),
-              
-              new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: "or", 
-                    size: 24,
-                    font: "Arial"
-                  }),
-                ],
-                spacing: { after: 100 },
-              }),
-              
-              new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: `Two similar completed works each costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionB.value : 0)}.`, 
-                    size: 24,
-                    font: "Arial"
-                  }),
-                ],
-                spacing: { after: 100 },
-              }),
-              
-              new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: "or", 
-                    size: 24,
-                    font: "Arial"
-                  }),
-                ],
-                spacing: { after: 100 },
-              }),
-              
-              new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: `One similar completed work costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionC.value : 0)}.`, 
-                    size: 24,
-                    font: "Arial"
-                  }),
-                ],
-                spacing: { after: 200 },
-              }),
-              
-            ] : [
-              // Show standard requirements when MSE relaxation is not enabled
-              new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: `Three similar completed works each costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionA.value : 0)}.`, 
-                    size: 24,
-                    font: "Arial"
-                  }),
-                ],
-                spacing: { after: 100 },
-              }),
-              
-              new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: "or", 
-                    size: 24,
-                    font: "Arial"
-                  }),
-                ],
-                spacing: { after: 100 },
-              }),
-              
-              new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: `Two similar completed works each costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionB.value : 0)}.`, 
-                    size: 24,
-                    font: "Arial"
-                  }),
-                ],
-                spacing: { after: 100 },
-              }),
-              
-              new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: "or", 
-                    size: 24,
-                    font: "Arial"
-                  }),
-                ],
-                spacing: { after: 100 },
-              }),
-              
-              new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: `One similar completed work costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionC.value : 0)}.`, 
-                    size: 24,
-                    font: "Arial"
-                  }),
-                ],
-                spacing: { after: 200 },
-              }),
-            ]),
-              
-                      new Paragraph({
-                        children: [
-                          new TextRun({ 
-                  text: `Definition of "similar work" should be clearly defined: ${bqcData.similarWorkDefinition || "N/A"}`, 
-                            size: 24,
-                            font: "Arial"
-                          }),
-                        ],
-              spacing: { after: 200 },
+                  
+                  new Paragraph({
+                    children: [
+                      new TextRun({ 
+                        text: `One similar completed work costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionC.value / 0.85 : 0)}.`, 
+                        size: 24,
+                        font: "Arial"
                       }),
-            
+                    ],
+                    spacing: { after: 100 },
+                  }),
+                  
+                  new Paragraph({
+                    children: [
+                      new TextRun({ 
+                        text: "or", 
+                        size: 24,
+                        font: "Arial"
+                      }),
+                    ],
+                    spacing: { after: 100 },
+                  }),
+                  
+                  new Paragraph({
+                    children: [
+                      new TextRun({ 
+                        text: `Two similar completed works each costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionB.value / 0.85 : 0)}.`, 
+                        size: 24,
+                        font: "Arial"
+                      }),
+                    ],
+                    spacing: { after: 100 },
+                  }),
+                  
+                  new Paragraph({
+                    children: [
+                      new TextRun({ 
+                        text: "or", 
+                        size: 24,
+                        font: "Arial"
+                      }),
+                    ],
+                    spacing: { after: 100 },
+                  }),
+                  
+                  new Paragraph({
+                    children: [
+                      new TextRun({ 
+                        text: `Three similar completed works each costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionA.value / 0.85 : 0)}.`, 
+                        size: 24,
+                        font: "Arial"
+                      }),
+                    ],
+                    spacing: { after: 200 },
+                  }),
+                ] : []),
+                
+                // Show MSE-specific content for least cash outflow when MSE relaxation is enabled
+                ...(bqcData.evaluationMethodology === 'least cash outflow' && bqcData.mseRelaxation ? [
+                  // MSE Relaxed Requirements
+                  new Paragraph({
+                    children: [
+                      new TextRun({ 
+                        text: "MSE Relaxed Requirements (15% reduction):", 
+                        bold: true,
+                        size: 24,
+                        font: "Arial"
+                      }),
+                    ],
+                    spacing: { after: 100 },
+                  }),
+                  
+                  new Paragraph({
+                    children: [
+                      new TextRun({ 
+                        text: `One similar completed work costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionC.value : 0)}.`, 
+                        size: 24,
+                        font: "Arial"
+                      }),
+                    ],
+                    spacing: { after: 100 },
+                  }),
+                  
+                  new Paragraph({
+                    children: [
+                      new TextRun({ 
+                        text: "or", 
+                        size: 24,
+                        font: "Arial"
+                      }),
+                    ],
+                    spacing: { after: 100 },
+                  }),
+                  
+                  new Paragraph({
+                    children: [
+                      new TextRun({ 
+                        text: `Two similar completed works each costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionB.value : 0)}.`, 
+                        size: 24,
+                        font: "Arial"
+                      }),
+                    ],
+                    spacing: { after: 100 },
+                  }),
+                  
+                  new Paragraph({
+                    children: [
+                      new TextRun({ 
+                        text: "or", 
+                        size: 24,
+                        font: "Arial"
+                      }),
+                    ],
+                    spacing: { after: 100 },
+                  }),
+                  
+                  new Paragraph({
+                    children: [
+                      new TextRun({ 
+                        text: `Three similar completed works each costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionA.value : 0)}.`, 
+                        size: 24,
+                        font: "Arial"
+                      }),
+                    ],
+                    spacing: { after: 200 },
+                  }),
+                ] : []),
+              
+              new Paragraph({
+                children: [
+                  new TextRun({ 
+                    text: `Definition of "similar work" should be clearly defined: ${bqcData.similarWorkDefinition || "N/A"}`, 
+                    size: 24,
+                    font: "Arial"
+                  }),
+                ],
+                spacing: { after: 200 },
+              }),
+            ] : []),
+          ] : []),
           ] : []),
           
           // Explanatory Note for Experience Requirements
@@ -1848,12 +1770,12 @@ router.post('/generate', async (req: AuthRequest, res) => {
             }),
           ] : []),
           
-          // Lot-wise Calculations Section - Only for Lot-wise methodology
-          ...(bqcData.evaluationMethodology === 'Lot-wise' && bqcData.lots && bqcData.lots.length > 0 ? [
+          // Lot-wise Technical Criteria Section - Only for Lot-wise methodology
+          ...(bqcData.evaluationMethodology === 'Lot-wise' && bqcData.lots && bqcData.lots.length > 0 && (bqcData.tenderType === 'Service' || bqcData.tenderType === 'Works') ? [
             new Paragraph({
               children: [
                 new TextRun({ 
-                  text: "3.1.3 LOT-WISE CALCULATIONS", 
+                  text: "3.1.2. BQC/PQC for Procurement of Works and Services", 
                   bold: true, 
                   size: 24,
                   font: "Arial"
@@ -1865,7 +1787,8 @@ router.post('/generate', async (req: AuthRequest, res) => {
             new Paragraph({
               children: [
                 new TextRun({ 
-                  text: "The following calculations are applicable for each lot individually:", 
+                  text: "3.1.1 PROVEN TRACK RECORD", 
+                  bold: true, 
                   size: 24,
                   font: "Arial"
                 }),
@@ -1873,7 +1796,29 @@ router.post('/generate', async (req: AuthRequest, res) => {
               spacing: { after: 200 },
             }),
             
-            // Lot-wise calculations table
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "The bidder shall have experience of having successfully executed similar works in the last Seven (7) years in any Oil & Gas Industry in India. The Value (Rs) of the similar work/s executed (proof of execution to be submitted) should be as follows:", 
+                  size: 24,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+            
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "Definition of \"similar work\": Similar works shall be considered as – \"Bidder should have executed the job of Pipeline Works for Hydrocarbons/Petrochemicals/ Fertilizers/Chemicals/ Fire Fighting system, with or without associated works.\"", 
+                  size: 24,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+            
+            // Lot-wise Technical Criteria table
             new Table({
               width: {
                 size: 100,
@@ -1896,7 +1841,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                         new Paragraph({
                           children: [
                             new TextRun({ 
-                              text: "Lot", 
+                              text: "Sr. No.", 
                               bold: true, 
                               size: 20,
                               font: "Arial"
@@ -1913,7 +1858,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                         new Paragraph({
                           children: [
                             new TextRun({ 
-                              text: "CEC (Incl. GST)", 
+                              text: "Section / Description", 
                               bold: true, 
                               size: 20,
                               font: "Arial"
@@ -1923,14 +1868,14 @@ router.post('/generate', async (req: AuthRequest, res) => {
                           spacing: { after: 100 },
                         }),
                       ],
-                      width: { size: 15, type: WidthType.PERCENTAGE },
+                      width: { size: 25, type: WidthType.PERCENTAGE },
                     }),
                     new TableCell({
                       children: [
                         new Paragraph({
                           children: [
                             new TextRun({ 
-                              text: "EMD Amount", 
+                              text: "One similar work of total value not less than (Rs. in Lakhs)", 
                               bold: true, 
                               size: 20,
                               font: "Arial"
@@ -1940,14 +1885,14 @@ router.post('/generate', async (req: AuthRequest, res) => {
                           spacing: { after: 100 },
                         }),
                       ],
-                      width: { size: 15, type: WidthType.PERCENTAGE },
+                      width: { size: 20, type: WidthType.PERCENTAGE },
                     }),
                     new TableCell({
                       children: [
                         new Paragraph({
                           children: [
                             new TextRun({ 
-                              text: "Turnover Req.", 
+                              text: "Two similar works EACH of value not less than (Rs. in Lakhs)", 
                               bold: true, 
                               size: 20,
                               font: "Arial"
@@ -1957,63 +1902,51 @@ router.post('/generate', async (req: AuthRequest, res) => {
                           spacing: { after: 100 },
                         }),
                       ],
-                      width: { size: 15, type: WidthType.PERCENTAGE },
+                      width: { size: 20, type: WidthType.PERCENTAGE },
                     }),
-                    ...(bqcData.tenderType === 'Goods' ? [
-                      new TableCell({
-                        children: [
-                          new Paragraph({
-                            children: [
-                              new TextRun({ 
-                                text: "Past Performance", 
-                                bold: true, 
-                                size: 20,
-                                font: "Arial"
-                              }),
-                            ],
-                            alignment: AlignmentType.CENTER,
-                            spacing: { after: 100 },
-                          }),
-                        ],
-                        width: { size: 20, type: WidthType.PERCENTAGE },
-                      }),
-                    ] : []),
-                    ...((bqcData.tenderType === 'Service' || bqcData.tenderType === 'Works') ? [
-                      new TableCell({
-                        children: [
-                          new Paragraph({
-                            children: [
-                              new TextRun({ 
-                                text: "Exp. Req. (40%)", 
-                                bold: true, 
-                                size: 20,
-                                font: "Arial"
-                              }),
-                            ],
-                            alignment: AlignmentType.CENTER,
-                            spacing: { after: 100 },
-                          }),
-                        ],
-                        width: { size: 20, type: WidthType.PERCENTAGE },
-                      }),
-                    ] : []),
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: "Three similar works EACH of value not less than (Rs. in Lakhs)", 
+                              bold: true, 
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                      width: { size: 20, type: WidthType.PERCENTAGE },
+                    }),
                   ],
                 }),
                 // Data rows for each lot
-                ...bqcData.lots.map((lot: any) => {
-                  const lotEMD = calculateEMD(lot.cecEstimateInclGst || 0, bqcData.tenderType || 'Goods');
-                  const lotTurnover = (lot.cecEstimateInclGst - (lot.hasAmc && lot.amcValue && lot.amcValue > 0 ? lot.amcValue : 0)) * 0.3;
-                  const lotPastPerformance = bqcData.tenderType === 'Goods' ? calculatePastPerformance(lot.quantitySupplied || 0, lot.mseRelaxation || false) : 0;
+                ...bqcData.lots.map((lot: LotData, index: number) => {
+                  const baseAmount = lot.cecEstimateInclGst || 0;
                   
-                  // Calculate experience requirements for Service/Works
-                  let lotExperienceReq = 0;
-                  if (bqcData.tenderType === 'Service' || bqcData.tenderType === 'Works') {
-                    const baseAmount = lot.cecEstimateInclGst || 0;
-                    const contractYears = (lot.contractPeriodMonths || 12) / 12;
-                    const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
-                    const finalAmount = lot.mseRelaxation ? annualizedAmount * 0.85 : annualizedAmount;
-                    lotExperienceReq = finalAmount * 0.4; // 40%
+                  // Parse contract period from text or use numeric value
+                  let contractMonths = lot.contractPeriodMonths || 12;
+                  if (lot.contractPeriodText) {
+                    const textMatch = lot.contractPeriodText.match(/(\d+)/);
+                    if (textMatch) {
+                      contractMonths = parseInt(textMatch[1]);
+                      // Handle years conversion
+                      if (lot.contractPeriodText.toLowerCase().includes('year')) {
+                        contractMonths = contractMonths * 12;
+                      }
+                    }
                   }
+                  
+                  const contractYears = contractMonths / 12;
+                  const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+                  const finalAmount = lot.mseRelaxation ? annualizedAmount * 0.85 : annualizedAmount;
+                  
+                  const optionA = finalAmount * 0.8; // 80% - One work
+                  const optionB = finalAmount * 0.5; // 50% - Two works each
+                  const optionC = finalAmount * 0.4; // 40% - Three works each
                   
                   return new TableRow({
                     children: [
@@ -2022,7 +1955,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                           new Paragraph({
                             children: [
                               new TextRun({ 
-                                text: lot.lotNumber || `Lot ${bqcData.lots.indexOf(lot) + 1}`, 
+                                text: `${index + 1}`, 
                                 size: 20,
                                 font: "Arial"
                               }),
@@ -2037,7 +1970,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                           new Paragraph({
                             children: [
                               new TextRun({ 
-                                text: formatIndianCurrency(lot.cecEstimateInclGst || 0), 
+                                text: lot.lotNumber || `LOT-${index + 1} (${lot.description || 'Region'})`, 
                                 size: 20,
                                 font: "Arial"
                               }),
@@ -2052,7 +1985,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                           new Paragraph({
                             children: [
                               new TextRun({ 
-                                text: `Rs. ${lotEMD.toFixed(1)} Lacs`, 
+                                text: `${(optionA / 100000).toFixed(2)}`, 
                                 size: 20,
                                 font: "Arial"
                               }),
@@ -2067,7 +2000,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                           new Paragraph({
                             children: [
                               new TextRun({ 
-                                text: formatTurnoverAmount(lotTurnover), 
+                                text: `${(optionB / 100000).toFixed(2)}`, 
                                 size: 20,
                                 font: "Arial"
                               }),
@@ -2077,40 +2010,21 @@ router.post('/generate', async (req: AuthRequest, res) => {
                           }),
                         ],
                       }),
-                      ...(bqcData.tenderType === 'Goods' ? [
-                        new TableCell({
-                          children: [
-                            new Paragraph({
-                              children: [
-                                new TextRun({ 
-                                  text: `${lotPastPerformance.toLocaleString()} Units${lot.mseRelaxation ? ' (MSE -15%)' : ''}`, 
-                                  size: 20,
-                                  font: "Arial"
-                                }),
-                              ],
-                              alignment: AlignmentType.CENTER,
-                              spacing: { after: 100 },
-                            }),
-                          ],
-                        }),
-                      ] : []),
-                      ...((bqcData.tenderType === 'Service' || bqcData.tenderType === 'Works') ? [
-                        new TableCell({
-                          children: [
-                            new Paragraph({
-                              children: [
-                                new TextRun({ 
-                                  text: formatExperienceCurrency(lotExperienceReq), 
-                                  size: 20,
-                                  font: "Arial"
-                                }),
-                              ],
-                              alignment: AlignmentType.CENTER,
-                              spacing: { after: 100 },
-                            }),
-                          ],
-                        }),
-                      ] : []),
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: `${(optionC / 100000).toFixed(2)}`, 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                      }),
                     ],
                   });
                 }),
@@ -2120,7 +2034,29 @@ router.post('/generate', async (req: AuthRequest, res) => {
             new Paragraph({
               children: [
                 new TextRun({ 
-                  text: "", 
+                  text: "Bidder can quote for any one or more than one LOT based on their capability/choice.", 
+                  size: 24,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 100 },
+            }),
+            
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "Bidder can quote for any one or more than one LOT based on their capability/choice.", 
+                  size: 24,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 100 },
+            }),
+            
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "Note: If the Bidder quotes for more than one LOT, the similar works criteria should not be less than the cumulative amount applicable for the LOTs quoted.", 
                   size: 24,
                   font: "Arial"
                 }),
@@ -2130,40 +2066,354 @@ router.post('/generate', async (req: AuthRequest, res) => {
           ] : []),
           
           // Financial Criteria
-                      new Paragraph({
-                        children: [
-                          new TextRun({ 
+          new Paragraph({
+            children: [
+              new TextRun({ 
                 text: "3.2 FINANCIAL CRITERIA", 
-                            bold: true, 
-                            size: 24,
-                            font: "Arial"
-                          }),
-                        ],
-            spacing: { after: 200 },
-                      }),
-          
-                      new Paragraph({
-                        children: [
-                          new TextRun({ 
-                text: "3.2.1 AVERAGE ANNUAL TURNOVER", 
                 bold: true, 
-                            size: 24,
-                            font: "Arial"
-                          }),
-                        ],
-            spacing: { after: 100 },
+                size: 24,
+                font: "Arial"
+              }),
+            ],
+            spacing: { after: 200 },
           }),
           
           new Paragraph({
             children: [
               new TextRun({ 
-                text: `The average annual turnover of the Bidder for last three audited accounting years shall be equal to or more than ${formatTurnoverAmount(turnoverAmount || 0)}.`, 
+                text: "3.2.1 ANNUAL TURNOVER", 
+                bold: true, 
                 size: 24,
                 font: "Arial"
-                  }),
-                ],
-            spacing: { after: 200 },
               }),
+            ],
+            spacing: { after: 100 },
+          }),
+          
+          ...(bqcData.evaluationMethodology === 'Lot-wise' && bqcData.lots && bqcData.lots.length > 0 ? [
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "The bidder should have achieved a minimum Average Annual financial turnover as per below table (LOT-WISE).as per Audited Balance sheet and P&L Statement in the last three* accounting years prior to due date of bid submission.", 
+                  size: 24,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+          ] : []),
+          
+          // Lot-wise Financial Criteria table
+          ...(bqcData.evaluationMethodology === 'Lot-wise' && bqcData.lots && bqcData.lots.length > 0 ? [
+            new Table({
+              width: {
+                size: 100,
+                type: WidthType.PERCENTAGE,
+              },
+              borders: {
+                top: { style: BorderStyle.SINGLE, size: 1 },
+                bottom: { style: BorderStyle.SINGLE, size: 1 },
+                left: { style: BorderStyle.SINGLE, size: 1 },
+                right: { style: BorderStyle.SINGLE, size: 1 },
+                insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
+                insideVertical: { style: BorderStyle.SINGLE, size: 1 },
+              },
+              rows: [
+                // Header row
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: "Sr. No.", 
+                              bold: true, 
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                      width: { size: 15, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: "Section / Description", 
+                              bold: true, 
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                      width: { size: 35, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: "Annualized Estimated Value (Rs. In Lakhs)", 
+                              bold: true, 
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                      width: { size: 25, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: "Average Annual Turnover (Rs. In Lakhs)", 
+                              bold: true, 
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                      width: { size: 25, type: WidthType.PERCENTAGE },
+                    }),
+                  ],
+                }),
+                // Data rows for each lot
+                ...bqcData.lots.map((lot: LotData, index: number) => {
+                  const baseAmount = lot.cecEstimateInclGst || 0;
+                  
+                  // Parse contract period from text or use numeric value
+                  let contractMonths = lot.contractPeriodMonths || 12;
+                  if (lot.contractPeriodText) {
+                    const textMatch = lot.contractPeriodText.match(/(\d+)/);
+                    if (textMatch) {
+                      contractMonths = parseInt(textMatch[1]);
+                      // Handle years conversion
+                      if (lot.contractPeriodText.toLowerCase().includes('year')) {
+                        contractMonths = contractMonths * 12;
+                      }
+                    }
+                  }
+                  
+                  const contractYears = contractMonths / 12;
+                  const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+                  const turnoverRequirement = annualizedAmount * 0.3; // 30% of annualized amount
+                  
+                  return new TableRow({
+                    children: [
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: `${index + 1}`, 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                      }),
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: lot.lotNumber || `LOT-${index + 1} (${lot.description || 'Region'})`, 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                      }),
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: `${(annualizedAmount / 100000).toFixed(2)}`, 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                      }),
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: `${(turnoverRequirement / 100000).toFixed(2)}`, 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                      }),
+                    ],
+                  });
+                }),
+                // Totals row
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: `${bqcData.lots.length + 1}`, 
+                              bold: true,
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                    }),
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: "TOTAL FOR ALL LOTS", 
+                              bold: true,
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                    }),
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: `${((bqcData.lots?.reduce((total: number, lot: LotData) => {
+                                const baseAmount = lot.cecEstimateInclGst || 0;
+                                let contractMonths = lot.contractPeriodMonths || 12;
+                                if (lot.contractPeriodText) {
+                                  const textMatch = lot.contractPeriodText.match(/(\d+)/);
+                                  if (textMatch) {
+                                    contractMonths = parseInt(textMatch[1]);
+                                    if (lot.contractPeriodText.toLowerCase().includes('year')) {
+                                      contractMonths = contractMonths * 12;
+                                    }
+                                  }
+                                }
+                                const contractYears = contractMonths / 12;
+                                const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+                                return total + annualizedAmount;
+                              }, 0) || 0) / 100000).toFixed(2)}`, 
+                              bold: true,
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                    }),
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: `${((bqcData.lots?.reduce((total: number, lot: LotData) => {
+                                const baseAmount = lot.cecEstimateInclGst || 0;
+                                let contractMonths = lot.contractPeriodMonths || 12;
+                                if (lot.contractPeriodText) {
+                                  const textMatch = lot.contractPeriodText.match(/(\d+)/);
+                                  if (textMatch) {
+                                    contractMonths = parseInt(textMatch[1]);
+                                    if (lot.contractPeriodText.toLowerCase().includes('year')) {
+                                      contractMonths = contractMonths * 12;
+                                    }
+                                  }
+                                }
+                                const contractYears = contractMonths / 12;
+                                const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+                                const turnoverRequirement = annualizedAmount * 0.3;
+                                return total + turnoverRequirement;
+                              }, 0) || 0) / 100000).toFixed(2)}`, 
+                              bold: true,
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                    }),
+                  ],
+                }),
+              ],
+            }),
+            
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "Bidder can quote for any one or more than one LOT based on their capability/choice.", 
+                  size: 24,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 100 },
+            }),
+            
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "Note: If the Bidder quotes for more than one LOT, the average value of Turnover should not be less than the cumulative amount applicable for the LOTs quoted.", 
+                  size: 24,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+          ] : [
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: `The average annual turnover of the Bidder for last three audited accounting years shall be equal to or more than ${formatTurnoverAmount(turnoverAmount || 0)}.`, 
+                  size: 24,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+          ]),
               
                       new Paragraph({
                         children: [
@@ -2324,28 +2574,293 @@ router.post('/generate', async (req: AuthRequest, res) => {
           }),
           
           // EMD
-                      new Paragraph({
-                        children: [
-                          new TextRun({ 
+          new Paragraph({
+            children: [
+              new TextRun({ 
                 text: `${sectionNumbers.emd}. EARNEST MONEY DEPOSIT (EMD)`, 
-                            bold: true, 
-                            size: 24,
-                            font: "Arial"
-                          }),
-                        ],
-            spacing: { after: 200 },
-                      }),
-          
-                      new Paragraph({
-                        children: [
-                          new TextRun({ 
-                text: `Bidders are required to provide Earnest Money Deposit equivalent to Rs. ${(emdAmount || 0).toFixed(2)} Lacs for the tender.`, 
-                            size: 24,
-                            font: "Arial"
-                          }),
-                        ],
+                bold: true, 
+                size: 24,
+                font: "Arial"
+              }),
+            ],
             spacing: { after: 200 },
           }),
+          
+          // EMD Content - Lot-wise or Single amount
+          ...(bqcData.evaluationMethodology === 'Lot-wise' && bqcData.lots && bqcData.lots.length > 0 ? [
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "Bidders are required to provide Earnest Money Deposit as per below table (LOT-WISE):", 
+                  size: 24,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+            
+            // Lot-wise EMD table
+            new Table({
+              width: {
+                size: 100,
+                type: WidthType.PERCENTAGE,
+              },
+              borders: {
+                top: { style: BorderStyle.SINGLE, size: 1 },
+                bottom: { style: BorderStyle.SINGLE, size: 1 },
+                left: { style: BorderStyle.SINGLE, size: 1 },
+                right: { style: BorderStyle.SINGLE, size: 1 },
+                insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
+                insideVertical: { style: BorderStyle.SINGLE, size: 1 },
+              },
+              rows: [
+                // Header row
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: "Sr. No.", 
+                              bold: true, 
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                      width: { size: 15, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: "Section / Description", 
+                              bold: true, 
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                      width: { size: 35, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: "CEC Estimate (Rs. In Lakhs)", 
+                              bold: true, 
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                      width: { size: 25, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: "EMD Amount (Rs. In Lakhs)", 
+                              bold: true, 
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                      width: { size: 25, type: WidthType.PERCENTAGE },
+                    }),
+                  ],
+                }),
+                // Data rows for each lot
+                ...bqcData.lots.map((lot: LotData, index: number) => {
+                  const lotEMD = calculateEMD(lot.cecEstimateInclGst || 0, bqcData.tenderType || 'Goods');
+                  
+                  return new TableRow({
+                    children: [
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: `${index + 1}`, 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                      }),
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: lot.lotNumber || `LOT-${index + 1} (${lot.description || 'Region'})`, 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                      }),
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: `${((lot.cecEstimateInclGst || 0) / 100000).toFixed(2)}`, 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                      }),
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [
+                              new TextRun({ 
+                                text: `${Math.round(lotEMD * 10) / 10}`, 
+                                size: 20,
+                                font: "Arial"
+                              }),
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 100 },
+                          }),
+                        ],
+                      }),
+                    ],
+                  });
+                }),
+                // Totals row
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: `${bqcData.lots.length + 1}`, 
+                              bold: true,
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                    }),
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: "TOTAL FOR ALL LOTS", 
+                              bold: true,
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                    }),
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: `${((bqcData.lots?.reduce((total: number, lot: LotData) => total + (lot.cecEstimateInclGst || 0), 0) || 0) / 100000).toFixed(2)}`, 
+                              bold: true,
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                    }),
+                    new TableCell({
+                      children: [
+                        new Paragraph({
+                          children: [
+                            new TextRun({ 
+                              text: `${Math.round((bqcData.lots?.reduce((total: number, lot: LotData) => total + calculateEMD(lot.cecEstimateInclGst || 0, bqcData.tenderType || 'Goods'), 0) || 0) * 10) / 10}`, 
+                              bold: true,
+                              size: 20,
+                              font: "Arial"
+                            }),
+                          ],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 100 },
+                        }),
+                      ],
+                    }),
+                  ],
+                }),
+              ],
+            }),
+            
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "Bidder can quote for any one or more than one LOT based on their capability/choice.", 
+                  size: 24,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 100 },
+            }),
+            
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "Note: If the Bidder quotes for more than one LOT, the EMD amount should not be less than the cumulative amount applicable for the LOTs quoted.", 
+                  size: 24,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+          ] : [
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: `Bidders are required to provide Earnest Money Deposit equivalent to Rs. ${Math.round((emdAmount || 0) * 100) / 100} Lacs for the tender.`, 
+                  size: 24,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+          ]),
           
           new Paragraph({
             children: [
@@ -2353,8 +2868,8 @@ router.post('/generate', async (req: AuthRequest, res) => {
                 text: "EMD exemption shall be as per General Terms & Conditions of GeM (applicable for GeM tenders)/ MSE policy", 
                 size: 24,
                 font: "Arial"
-                  }),
-                ],
+              }),
+            ],
             spacing: { after: 400 },
           }),
           
@@ -2441,119 +2956,117 @@ router.post('/generate', async (req: AuthRequest, res) => {
           new Paragraph({
             children: [
               new TextRun({ 
-                text: `Earnest Money Deposit as per Sr. No. ${sectionNumbers.emd} above.${bqcData.hasPerformanceSecurity ? `/ Performance Security as per Sr. No. ${sectionNumbers.performanceSecurity} (if applicable)` : ''}`, 
+                text: `Earnest Money Deposit as per Sr. No. ${sectionNumbers.emd} above.${bqcData.hasPerformanceSecurity ? '/ Performance Security as per Sr. No. ' + sectionNumbers.performanceSecurity + ' (if applicable)' : ''}`, 
                 size: 24,
                 font: "Arial"
                   }),
                 ],
-            spacing: { after: 400 },
+                spacing: { after: 400 },
               }),
               
-               // Approval Section - Centered
-                       new Paragraph({
-                         children: [
-                           new TextRun({ 
-                 text: "Proposed by", 
-                             bold: true, 
-                             size: 24,
-                             font: "Arial"
-                           }),
-                         ],
-             alignment: AlignmentType.CENTER,
-             spacing: { after: 200 },
-                       }),
-           
-                       new Paragraph({
-                         children: [
-                           new TextRun({ 
-                 text: `${bqcData.proposedBy || "XXXXX"}${bqcData.proposedByDesignation ? `, ${bqcData.proposedByDesignation}` : ', Procurement Manager (CPO Mktg.)'}`, 
-                             size: 24,
-                             font: "Arial"
-                           }),
-                         ],
-             alignment: AlignmentType.CENTER,
-             spacing: { after: 400 },
-               }),
-               
-                       new Paragraph({
-                         children: [
-                           new TextRun({ 
-                 text: "Recommended by", 
-                             bold: true, 
-                             size: 24,
-                             font: "Arial"
-                           }),
-                         ],
-             alignment: AlignmentType.CENTER,
-             spacing: { after: 200 },
-                       }),
-           
-                       new Paragraph({
-                         children: [
-                           new TextRun({ 
-                 text: `${bqcData.recommendedBy || "XXXXXX"}${bqcData.recommendedByDesignation ? `, ${bqcData.recommendedByDesignation}` : ', Procurement Leader (CPO Mktg.)'}`, 
-                             size: 24,
-                             font: "Arial"
-                           }),
-                         ],
-             alignment: AlignmentType.CENTER,
-             spacing: { after: 400 },
-               }),
-               
-                       new Paragraph({
-                         children: [
-                           new TextRun({ 
-                 text: "Concurred by", 
-                             bold: true, 
-                             size: 24,
-                             font: "Arial"
-                           }),
-                         ],
-             alignment: AlignmentType.CENTER,
-             spacing: { after: 200 },
-                       }),
-           
-                       new Paragraph({
-                         children: [
-                           new TextRun({ 
-                 text: `${bqcData.concurredBy || "Rajesh J."}${bqcData.concurredByDesignation ? `, ${bqcData.concurredByDesignation}` : ', General Manager Finance (CPO Marketing)'}`, 
-                             size: 24,
-                             font: "Arial"
-                           }),
-                         ],
-             alignment: AlignmentType.CENTER,
-             spacing: { after: 400 },
-               }),
-               
-                       new Paragraph({
-                         children: [
-                           new TextRun({ 
-                 text: "Approved by", 
-                             bold: true, 
-                             size: 24,
-                             font: "Arial"
-                           }),
-                         ],
-             alignment: AlignmentType.CENTER,
-             spacing: { after: 200 },
-                       }),
-           
-                       new Paragraph({
-                         children: [
-                           new TextRun({ 
-                 text: `${bqcData.approvedBy || "Kani Amudhan N."}${bqcData.approvedByDesignation ? `, ${bqcData.approvedByDesignation}` : ', Chief Procurement Officer (CPO Marketing)'}`, 
-                             size: 24,
-                             font: "Arial"
-                           }),
-                         ],
-             alignment: AlignmentType.CENTER,
-             spacing: { after: 200 },
-           }),
+          // Approval Section - Centered
+          new Paragraph({
+            children: [
+              new TextRun({ 
+                text: "Proposed by",
+                bold: true, 
+                size: 24,
+                font: "Arial"
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 },
+          }),
+          
+          new Paragraph({
+            children: [
+              new TextRun({ 
+                text: `${bqcData.proposedBy || "XXXXX"}${bqcData.proposedByDesignation ? ', ' + bqcData.proposedByDesignation : ', Procurement Manager (CPO Mktg.)'}`,
+                size: 24,
+                font: "Arial"
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 400 },
+          }),
+          
+          new Paragraph({
+            children: [
+              new TextRun({ 
+                text: "Recommended by",
+                bold: true, 
+                size: 24,
+                font: "Arial"
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 },
+          }),
+          
+          new Paragraph({
+            children: [
+              new TextRun({ 
+                text: `${bqcData.recommendedBy || "XXXXXX"}${bqcData.recommendedByDesignation ? ', ' + bqcData.recommendedByDesignation : ', Procurement Leader (CPO Mktg.)'}`,
+                size: 24,
+                font: "Arial"
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 400 },
+          }),
+          
+          new Paragraph({
+            children: [
+              new TextRun({ 
+                text: "Concurred by",
+                bold: true, 
+                size: 24,
+                font: "Arial"
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 },
+          }),
+          
+          new Paragraph({
+            children: [
+              new TextRun({ 
+                text: `${bqcData.concurredBy || "Rajesh J."}${bqcData.concurredByDesignation ? ', ' + bqcData.concurredByDesignation : ', General Manager Finance (CPO Marketing)'}`,
+                size: 24,
+                font: "Arial"
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 400 },
+          }),
+          
+          new Paragraph({
+            children: [
+              new TextRun({ 
+                text: "Approved by",
+                bold: true, 
+                size: 24,
+                font: "Arial"
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 },
+          }),
+          
+          new Paragraph({
+            children: [
+              new TextRun({ 
+                text: `${bqcData.approvedBy || "Kani Amudhan N."}${bqcData.approvedByDesignation ? ', ' + bqcData.approvedByDesignation : ', Chief Procurement Officer (CPO Marketing)'}`,
+                size: 24,
+                font: "Arial"
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 },
+          }),
         ],
       }],
     });
-
-    // Generate buffer
     const buffer = await Packer.toBuffer(doc);
     
     // Set response headers for file download

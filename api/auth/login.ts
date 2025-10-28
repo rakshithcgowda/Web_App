@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcryptjs';
-import { database } from '../../server/models/database-adapter.js';
-import { generateToken } from '../../server/middleware/auth.js';
+import { database } from '../../server/models/database-adapter';
+import { generateToken } from '../../server/middleware/auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers
@@ -67,6 +67,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
+      });
+    }
+
+    // Check if user is approved
+    if (!user.is_approved) {
+      console.log('Login failed: user not approved:', username);
+      return res.status(403).json({
+        success: false,
+        message: 'Your account is pending admin approval. Please contact the administrator.'
       });
     }
 

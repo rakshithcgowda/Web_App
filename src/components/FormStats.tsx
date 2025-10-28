@@ -31,7 +31,7 @@ export function FormStats({
     },
     {
       name: 'Estimated Value',
-      value: estimatedValue ? `₹${estimatedValue.toFixed(2)}L` : '₹0.00L',
+      value: estimatedValue ? `₹${Math.round(estimatedValue * 100) / 100}L` : '₹0.00L',
       subValue: 'Contract value',
       icon: ChartBarIcon,
       color: 'purple',

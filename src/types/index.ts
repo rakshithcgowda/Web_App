@@ -3,6 +3,10 @@ export interface User {
   username: string;
   email: string;
   fullName: string;
+  isApproved?: boolean;
+  approvedAt?: string;
+  approvedBy?: number;
+  approvedByUsername?: string;
   createdAt: string;
 }
 
@@ -25,12 +29,18 @@ export interface LotData {
   description: string;
   cecEstimateInclGst: number;
   cecEstimateExclGst: number;
-  contractPeriodMonths: number;
-  hasAmc: boolean;
-  amcValue: number;
-  amcPeriod: string;
-  mseRelaxation?: boolean; // Added MSE relaxation for individual lots
-  quantitySupplied: number; // Added quantity supplied field
+  contractPeriodMonths: number; // Keep for backward compatibility and calculations
+  contractPeriodText: string; // New field for text-based contract period input
+  quantitySupplied?: number; // For past performance calculation in Goods tender type
+  mseRelaxation?: boolean; // For MSE relaxation in past performance calculation
+  // AMC/CAMC fields per lot
+  hasAmc?: boolean;
+  amcValue?: number;
+  amcPeriod?: string;
+  // Lot-wise similar works fields
+  similarWorksOptionA?: number; // 40% of lot CEC
+  similarWorksOptionB?: number; // 50% of lot CEC
+  similarWorksOptionC?: number; // 80% of lot CEC
 }
 
 export interface ProgressStep {
@@ -58,6 +68,7 @@ export interface BQCData {
   lots: LotData[];
   scopeOfWork: string;
   contractPeriodMonths: string;
+  contractPeriodText: string; // Text-based contract period for display
   contractDurationYears: number;
   deliveryPeriod: string;
   bidValidityPeriod: string;
@@ -152,4 +163,15 @@ export interface SavedBQCEntry {
 export interface DocumentGenerationRequest {
   data: BQCData;
   format?: 'docx' | 'pdf';
+}
+
+export interface UserManagementRequest {
+  userId: number;
+  action: 'approve' | 'reject';
+}
+
+export interface UserManagementResponse {
+  success: boolean;
+  message: string;
+  data?: User[];
 }

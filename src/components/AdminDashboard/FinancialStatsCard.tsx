@@ -8,9 +8,9 @@ interface FinancialStatsCardProps {
 const FinancialStatsCard: React.FC<FinancialStatsCardProps> = ({ stats }) => {
   const formatCurrency = (amount: number) => {
     if (amount >= 10000000) {
-      return `₹${(amount / 10000000).toFixed(2)} Cr`;
+      return `₹${Math.round((amount / 10000000) * 100) / 100} Cr`;
     } else if (amount >= 100000) {
-      return `₹${(amount / 100000).toFixed(2)} L`;
+      return `₹${Math.round((amount / 100000) * 100) / 100} L`;
     } else {
       return `₹${amount.toLocaleString()}`;
     }
@@ -103,7 +103,7 @@ const FinancialStatsCard: React.FC<FinancialStatsCardProps> = ({ stats }) => {
                 />
               </div>
               <div className="text-xs text-gray-500">
-                {percentage.toFixed(1)}% of total BQCs
+                {Math.round(percentage * 10) / 10}% of total BQCs
               </div>
             </div>
           );

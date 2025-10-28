@@ -72,6 +72,7 @@ export const DEFAULT_BQC_DATA = {
   lots: [],
   scopeOfWork: '',
   contractPeriodMonths: '1 year',
+  contractPeriodText: '1 year',
   contractDurationYears: 1,
   deliveryPeriod: 'AS per tender terms and conditions',
   bidValidityPeriod: '90 days',
@@ -145,6 +146,7 @@ export const API_ENDPOINTS = {
     STATS_TENDER_TYPES: '/api/admin/stats-tender-types',
     STATS_FINANCIAL: '/api/admin/stats-financial',
     BQC_ENTRIES: '/api/admin/bqc-entries',
-    EXPORT: '/api/admin/export'
+    EXPORT: '/api/admin/export',
+    USERS: '/api/admin/users'
   }
 } as const;

@@ -1,7 +1,7 @@
 // import React from 'react';
 import type { BQCData } from '@/types';
 import { DIVISIBILITY_OPTIONS } from '@/utils/constants';
-import { formatCurrency } from '@/utils/calculations';
+import { formatCurrency, calculateEMD } from '@/utils/calculations';
 import { ExplanatoryNote } from '../ExplanatoryNote';
 
 interface OtherSectionProps {
@@ -124,7 +124,7 @@ export function OtherSection({ data, onChange, calculatedValues }: OtherSectionP
               </p>
             </div>
           ) : (
-            /* Lot-wise - Show reference to Preamble table */
+            /* Lot-wise - Show actual EMD calculations */
             <div className="bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 rounded-xl p-6">
               <div className="flex items-center space-x-2 mb-4">
                 <svg className="h-5 w-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -133,11 +133,72 @@ export function OtherSection({ data, onChange, calculatedValues }: OtherSectionP
                 <h5 className="text-md font-semibold text-emerald-900">Lot-wise EMD</h5>
               </div>
               
-              <div className="space-y-3">
-                <p className="text-sm text-emerald-800 font-medium">
-                  EMD calculated per lot in Preamble table
-                </p>
-              </div>
+              {data.lots && data.lots.length > 0 ? (
+                <div className="space-y-4">
+                  {/* EMD Table */}
+                  <div className="bg-white/80 rounded-lg border border-emerald-200 overflow-hidden">
+                    <div className="grid grid-cols-3 gap-2 p-4 bg-gradient-to-r from-emerald-100 to-green-100 font-semibold text-emerald-900 text-sm">
+                      <div className="col-span-1">Lot</div>
+                      <div className="col-span-1">CEC Estimate</div>
+                      <div className="col-span-1">EMD Amount</div>
+                    </div>
+
+                    {/* Table Rows */}
+                    {data.lots.map((lot) => {
+                      console.log(`OtherSection EMD: Lot ${lot.lotNumber}, CEC=${lot.cecEstimateInclGst}, TenderType="${data.tenderType}"`);
+                      // Ensure tender type is properly set - if undefined, show warning
+                      const tenderType = data.tenderType || 'Goods';
+                      if (!data.tenderType) {
+                        console.warn('Tender type is undefined! Defaulting to Goods');
+                      }
+                      const lotEMD = calculateEMD(lot.cecEstimateInclGst || 0, tenderType);
+                      console.log(`OtherSection EMD Result: ${lotEMD}`);
+                      return (
+                        <div key={lot.id} className="grid grid-cols-3 gap-2 p-3 border-t border-emerald-100 hover:bg-emerald-50/50 transition-colors duration-200">
+                          {/* Lot Number */}
+                          <div className="col-span-1">
+                            <div className="font-medium text-emerald-900 text-sm">
+                              {lot.lotNumber}
+                            </div>
+                          </div>
+
+                          {/* CEC Estimate */}
+                          <div className="col-span-1">
+                            <div className="text-sm text-emerald-700">
+                              ₹{Math.round((lot.cecEstimateInclGst || 0) * 10) / 10}Cr
+                            </div>
+                          </div>
+
+                          {/* EMD Amount */}
+                          <div className="col-span-1">
+                            <div className="text-sm h-8 w-full px-3 py-1 bg-yellow-50 border border-yellow-200 rounded flex items-center text-yellow-700 font-medium">
+                              {lotEMD === 0 ? 'Nil' : `Rs. ${Math.round(lotEMD * 10) / 10} Lacs`}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Summary Row */}
+                    <div className="grid grid-cols-3 gap-2 p-3 bg-gradient-to-r from-emerald-100 to-green-100 border-t-2 border-emerald-300 font-bold text-emerald-900 text-sm">
+                      <div className="col-span-1">TOTAL</div>
+                      <div className="col-span-1">₹{Math.round(data.lots.reduce((total, lot) => total + (lot.cecEstimateInclGst || 0), 0) * 10) / 10}Cr</div>
+                      <div className="col-span-1">
+                        {(() => {
+                          const totalEMD = data.lots.reduce((total, lot) => total + calculateEMD(lot.cecEstimateInclGst || 0, data.tenderType || 'Goods'), 0);
+                          return totalEMD === 0 ? 'Nil' : `Rs. ${Math.round(totalEMD * 10) / 10} Lacs`;
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 bg-white/60 rounded-lg border border-emerald-100">
+                  <div className="text-4xl mb-4">📋</div>
+                  <p className="text-emerald-700 font-medium mb-2">No lots added yet</p>
+                  <p className="text-emerald-600 text-sm">Add lots in the Preamble tab to view EMD calculations</p>
+                </div>
+              )}
             </div>
           )}
         </div>

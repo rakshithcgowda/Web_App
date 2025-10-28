@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { database } from '../../server/models/database-adapter.js';
-import { authenticateTokenVercel } from '../../server/middleware/auth.js';
+import { database } from '../../server/models/database-adapter';
+import { authenticateTokenVercel } from '../../server/middleware/auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers
@@ -31,15 +31,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const { page = '1', limit = '10', search = '', startDate = '', endDate = '' } = req.query;
+    // Check if user is admin (username: admin)
+    const adminUser = await database.getUserById(authResult.userId!);
+    if (!adminUser || adminUser.username !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
+    const { page = '1', limit = '10', search = '', startDate = '', endDate = '', groupName = '', tenderType = '' } = req.query;
 
     // Get BQC entries with pagination and filters
-    const entries = await database.getAdminBQCEntries({
+    const entries = await database.getBQCEntries({
       page: parseInt(page as string),
       limit: parseInt(limit as string),
       search: search as string,
       startDate: startDate as string,
-      endDate: endDate as string
+      endDate: endDate as string,
+      groupName: groupName as string,
+      tenderType: tenderType as string
     });
 
     res.json({

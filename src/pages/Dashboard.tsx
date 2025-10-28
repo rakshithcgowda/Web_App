@@ -41,13 +41,16 @@ export function Dashboard() {
                 </div>
               </div>
 
-              <Link
-                to="/admin"
-                className="flex items-center space-x-3 px-5 py-3 text-sm font-semibold text-gray-600 hover:text-blue-600 hover:bg-blue-50/80 rounded-xl transition-all duration-300 border border-transparent hover:border-blue-200/50 hover:shadow-md backdrop-blur-sm"
-              >
-                <ChartBarIcon className="h-5 w-5" />
-                <span>Admin Dashboard</span>
-              </Link>
+              {/* Only show Admin Dashboard for admin user */}
+              {user?.username === 'admin' && (
+                <Link
+                  to="/admin"
+                  className="flex items-center space-x-3 px-5 py-3 text-sm font-semibold text-gray-600 hover:text-blue-600 hover:bg-blue-50/80 rounded-xl transition-all duration-300 border border-transparent hover:border-blue-200/50 hover:shadow-md backdrop-blur-sm"
+                >
+                  <ChartBarIcon className="h-5 w-5" />
+                  <span>Admin Dashboard</span>
+                </Link>
+              )}
               
               <button
                 onClick={handleLogout}

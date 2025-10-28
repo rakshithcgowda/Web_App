@@ -8,9 +8,9 @@ interface TenderTypeChartProps {
 const TenderTypeChart: React.FC<TenderTypeChartProps> = ({ data }) => {
   const formatCurrency = (amount: number) => {
     if (amount >= 10000000) {
-      return `₹${(amount / 10000000).toFixed(1)}Cr`;
+      return `₹${Math.round((amount / 10000000) * 10) / 10}Cr`;
     } else if (amount >= 100000) {
-      return `₹${(amount / 100000).toFixed(1)}L`;
+      return `₹${Math.round((amount / 100000) * 10) / 10}L`;
     } else {
       return `₹${amount.toLocaleString()}`;
     }
@@ -117,7 +117,7 @@ const TenderTypeChart: React.FC<TenderTypeChartProps> = ({ data }) => {
                   </div>
                   
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span>{percentage.toFixed(1)}% of total</span>
+                    <span>{Math.round(percentage * 10) / 10}% of total</span>
                     <span>Avg: {formatCurrency(item.avgValue)}</span>
                   </div>
                 </div>

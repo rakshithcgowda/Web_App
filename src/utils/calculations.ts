@@ -1,64 +1,111 @@
 import type { BQCData } from '@/types';
 
 /**
+ * Calculate EMD amount for BQC/PQC criteria based on lot position
+ * Returns values in Lakhs as per the specified criteria
+ */
+export function calculateBQCEMD(lotIndex: number): number {
+  // EMD amounts as per the specified criteria
+  const emdAmounts = [2.5, 1, 0, 1, 1]; // Lot 1, 2, 3, 4, 5
+  
+  if (lotIndex >= 0 && lotIndex < emdAmounts.length) {
+    return emdAmounts[lotIndex];
+  }
+  
+  // Default to 0 for lots beyond the specified range
+  return 0;
+}
+
+/**
+ * Format EMD amount for display in the BQC/PQC format
+ */
+export function formatEMDAmount(emdAmount: number): string {
+  if (emdAmount === 0) {
+    return 'Nil';
+  }
+  return `Rs. ${emdAmount} Lacs`;
+}
+
+/**
  * Calculate EMD amount based on estimated value and tender type
- * Based on the provided EMD table - returns values in Lakhs
+ * Based on the official EMD table - returns values in Lakhs
+ * 
+ * EMD Table (Fixed amounts in Lakhs):
+ * 50L-100L: Goods=Nil, Service=1L, Works=1L (inclusive of both 50L and 100L)
+ * >100L-500L: All types=2.5L
+ * >500L-1000L: All types=5L
+ * >1000L-1500L: All types=7.5L
+ * >1500L-2500L: All types=10L
+ * >2500L: All types=20L
  */
 export function calculateEMD(estimatedValue: number, tenderType: string): number {
+  // Convert Cr to Lakhs for calculation (1 Cr = 100 Lakhs)
+  const valueInLakhs = estimatedValue * 100;
+  
+  // Debug logging
+  console.log(`EMD Calculation: Value=${estimatedValue}Cr (${valueInLakhs}L), Type="${tenderType}"`);
+  
   if (tenderType === 'Goods') {
-    // Goods: 0.5-1.0 Cr = Nil, >1.0 Cr = progressive rates
-    if (estimatedValue >= 0.5 && estimatedValue <= 1.0) {
+    // Goods: 50L-100L = Nil, >100L = fixed amounts
+    if (valueInLakhs >= 50 && valueInLakhs <= 100) {
+      console.log('Goods: Returning Nil for 50L-100L range');
       return 0; // Nil
-    } else if (estimatedValue > 1.0 && estimatedValue <= 5.0) {
+    } else if (valueInLakhs > 100 && valueInLakhs <= 500) {
       return 2.5; // 2.5 Lakhs
-    } else if (estimatedValue > 5.0 && estimatedValue <= 10.0) {
+    } else if (valueInLakhs > 500 && valueInLakhs <= 1000) {
       return 5; // 5 Lakhs
-    } else if (estimatedValue > 10.0 && estimatedValue <= 15.0) {
+    } else if (valueInLakhs > 1000 && valueInLakhs <= 1500) {
       return 7.5; // 7.5 Lakhs
-    } else if (estimatedValue > 15.0 && estimatedValue <= 25.0) {
+    } else if (valueInLakhs > 1500 && valueInLakhs <= 2500) {
       return 10; // 10 Lakhs
-    } else if (estimatedValue > 25.0) {
+    } else if (valueInLakhs > 2500) {
       return 20; // 20 Lakhs
     }
-    return 0;
+    console.log('Goods: Returning 0 for values < 50L');
+    return 0; // For values < 50L
   }
   
   if (tenderType === 'Service') {
-    // Services: 0.5-1.0 Cr = 1L, >1.0 Cr = progressive rates
-    if (estimatedValue >= 0.5 && estimatedValue <= 1.0) {
+    // Service: 50L-100L = 1L (inclusive), >100L = fixed amounts
+    if (valueInLakhs >= 50 && valueInLakhs <= 100) {
+      console.log('Service: Returning 1L for 50L-100L range');
       return 1; // 1 Lakh
-    } else if (estimatedValue > 1.0 && estimatedValue <= 5.0) {
+    } else if (valueInLakhs > 100 && valueInLakhs <= 500) {
       return 2.5; // 2.5 Lakhs
-    } else if (estimatedValue > 5.0 && estimatedValue <= 10.0) {
+    } else if (valueInLakhs > 500 && valueInLakhs <= 1000) {
       return 5; // 5 Lakhs
-    } else if (estimatedValue > 10.0 && estimatedValue <= 15.0) {
+    } else if (valueInLakhs > 1000 && valueInLakhs <= 1500) {
       return 7.5; // 7.5 Lakhs
-    } else if (estimatedValue > 15.0 && estimatedValue <= 25.0) {
+    } else if (valueInLakhs > 1500 && valueInLakhs <= 2500) {
       return 10; // 10 Lakhs
-    } else if (estimatedValue > 25.0) {
+    } else if (valueInLakhs > 2500) {
       return 20; // 20 Lakhs
     }
-    return 0; // For values < 0.5 Cr
+    console.log('Service: Returning 0 for values < 50L');
+    return 0; // For values < 50L
   }
   
   if (tenderType === 'Works') {
-    // Works: 0.5-1.0 Cr = 1L, >1.0 Cr = progressive rates
-    if (estimatedValue >= 0.5 && estimatedValue <= 1.0) {
+    // Works: 50L-100L = 1L (inclusive), >100L = fixed amounts
+    if (valueInLakhs >= 50 && valueInLakhs <= 100) {
+      console.log('Works: Returning 1L for 50L-100L range');
       return 1; // 1 Lakh
-    } else if (estimatedValue > 1.0 && estimatedValue <= 5.0) {
+    } else if (valueInLakhs > 100 && valueInLakhs <= 500) {
       return 2.5; // 2.5 Lakhs
-    } else if (estimatedValue > 5.0 && estimatedValue <= 10.0) {
+    } else if (valueInLakhs > 500 && valueInLakhs <= 1000) {
       return 5; // 5 Lakhs
-    } else if (estimatedValue > 10.0 && estimatedValue <= 15.0) {
+    } else if (valueInLakhs > 1000 && valueInLakhs <= 1500) {
       return 7.5; // 7.5 Lakhs
-    } else if (estimatedValue > 15.0 && estimatedValue <= 25.0) {
+    } else if (valueInLakhs > 1500 && valueInLakhs <= 2500) {
       return 10; // 10 Lakhs
-    } else if (estimatedValue > 25.0) {
+    } else if (valueInLakhs > 2500) {
       return 20; // 20 Lakhs
     }
-    return 0; // For values < 0.5 Cr
+    console.log('Works: Returning 0 for values < 50L');
+    return 0; // For values < 50L
   }
   
+  console.log(`Unknown tender type: "${tenderType}", returning 0`);
   return 0; // Default case
 }
 
@@ -161,15 +208,11 @@ export function calculateTurnoverRequirement(data: BQCData): {
   // Calculate turnover requirement as 30% of (CEC including GST - AMC)
   const turnoverAmount = basePercentage * baseAmount;
   
-  // Apply annualization for all tender types if contract duration > 1 year
+  // Always apply annualization based on contract duration (divide by contract period)
   const contractDurationYears = data.contractDurationYears || 1;
-  let annualizedAmount = turnoverAmount;
+  const annualizedAmount = turnoverAmount / contractDurationYears;
   
-  if (contractDurationYears > 1) {
-    annualizedAmount = turnoverAmount / contractDurationYears;
-  }
-  
-  const description = `${basePercentage * 100}% of (CEC including GST${(data.hasAmc && data.amcValue && data.amcValue > 0) || (data.lots && data.lots.some(lot => lot.hasAmc && lot.amcValue && lot.amcValue > 0)) ? ' - AMC' : ''})`;
+  const description = `${basePercentage * 100}% of (CEC including GST${(data.hasAmc && data.amcValue && data.amcValue > 0) || (data.lots && data.lots.some(lot => lot.hasAmc && lot.amcValue && lot.amcValue > 0)) ? ' - AMC' : ''}) ÷ ${contractDurationYears} year${contractDurationYears !== 1 ? 's' : ''}`;
 
   return {
     amount: annualizedAmount,
@@ -178,6 +221,71 @@ export function calculateTurnoverRequirement(data: BQCData): {
   };
 }
 
+
+/**
+ * Calculate lot-wise similar works requirements for Service/Works
+ */
+export function calculateLotWiseSimilarWorks(data: BQCData): {
+  lots: Array<{
+    lotId: string;
+    lotNumber: string;
+    optionA: number;
+    optionB: number;
+    optionC: number;
+  }>;
+  totals: {
+    optionA: number;
+    optionB: number;
+    optionC: number;
+  };
+} {
+  if (data.tenderType !== 'Service' && data.tenderType !== 'Works') {
+    return {
+      lots: [],
+      totals: { optionA: 0, optionB: 0, optionC: 0 }
+    };
+  }
+
+  const lots = data.lots?.map(lot => {
+    const baseAmount = lot.cecEstimateInclGst || 0;
+    
+    // Parse contract period from text or use numeric value
+    let contractMonths = lot.contractPeriodMonths || 12;
+    if (lot.contractPeriodText) {
+      const numericMatch = lot.contractPeriodText.match(/(\d+)/);
+      if (numericMatch) {
+        contractMonths = parseInt(numericMatch[1]);
+        // Handle years conversion
+        if (lot.contractPeriodText.toLowerCase().includes('year')) {
+          contractMonths = contractMonths * 12;
+        }
+      }
+    }
+    
+    const contractYears = contractMonths / 12;
+    const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+    const finalAmount = lot.mseRelaxation ? annualizedAmount * 0.85 : annualizedAmount;
+    
+    return {
+      lotId: lot.id,
+      lotNumber: lot.lotNumber,
+      optionA: finalAmount * 0.4, // 40%
+      optionB: finalAmount * 0.5, // 50%
+      optionC: finalAmount * 0.8  // 80%
+    };
+  }) || [];
+
+  const totals = lots.reduce(
+    (acc, lot) => ({
+      optionA: acc.optionA + lot.optionA,
+      optionB: acc.optionB + lot.optionB,
+      optionC: acc.optionC + lot.optionC
+    }),
+    { optionA: 0, optionB: 0, optionC: 0 }
+  );
+
+  return { lots, totals };
+}
 
 /**
  * Calculate experience requirements for Service/Works
@@ -256,19 +364,33 @@ export function getStandardPerformanceSecurity(tenderType: string): number {
 }
 
 /**
- * Format currency amount for display
+ * Format currency amount for display - updated to handle Lakhs and Crores properly
  */
 export function formatCurrency(amount: number, suffix: string = 'Crore'): string {
   if (amount === 0) return `Rs. 0.00 ${suffix}`;
-  return `Rs. ${amount.toFixed(2)} ${suffix}`;
+  
+  // Round to 2 decimal places
+  const roundedAmount = Math.round(amount * 100) / 100;
+  
+  return `Rs. ${roundedAmount} ${suffix}`;
+}
+
+/**
+ * Format amount in Lakhs - specifically for BQC/PQC criteria
+ */
+export function formatAmountInLakhs(amountInCrores: number): string {
+  const amountInLakhs = amountInCrores * 100;
+  const roundedAmount = Math.round(amountInLakhs * 100) / 100;
+  return `${roundedAmount}`;
 }
 
 /**
  * Format turnover amount - always display in Crores
  */
 export function formatTurnoverAmount(amountInCrores: number): string {
-  // Always display in Crores format
-  return `Rs. ${amountInCrores.toFixed(2)} Crore`;
+  // Always display in Crores format, rounded to 2 decimal places
+  const roundedAmount = Math.round(amountInCrores * 100) / 100;
+  return `Rs. ${roundedAmount} Crore`;
 }
 
 /**

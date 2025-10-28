@@ -206,6 +206,27 @@ export function validateBQCData(data: BQCData): {
           }
         });
       }
+
+      // Validate lot-wise AMC fields
+      data.lots.forEach((lot, index) => {
+        if (lot.hasAmc) {
+          // AMC Value validation
+          if (lot.amcValue === undefined || lot.amcValue === null || lot.amcValue <= 0) {
+            errors.push({
+              field: 'lots',
+              message: `Lot ${index + 1}: AMC Value must be greater than 0 when AMC is enabled`
+            });
+          }
+          
+          // AMC Period validation (optional but if provided should not be empty)
+          if (lot.amcPeriod !== undefined && lot.amcPeriod !== null && lot.amcPeriod.trim() === '') {
+            errors.push({
+              field: 'lots',
+              message: `Lot ${index + 1}: AMC Period cannot be empty when AMC is enabled`
+            });
+          }
+        }
+      });
     }
   }
 

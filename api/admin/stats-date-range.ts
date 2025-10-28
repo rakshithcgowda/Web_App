@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { database } from '../../server/models/database-adapter.js';
-import { authenticateTokenVercel } from '../../server/middleware/auth.js';
+import { database } from '../../server/models/database-adapter';
+import { authenticateTokenVercel } from '../../server/middleware/auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers
@@ -31,12 +31,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const { startDate, endDate } = req.query;
+    // Check if user is admin (username: admin)
+    const adminUser = await database.getUserById(authResult.userId!);
+    if (!adminUser || adminUser.username !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+
+    const { startDate, endDate, groupBy } = req.query;
 
     // Get date range stats
-    const stats = await database.getAdminStatsDateRange({
+    const stats = await database.getBQCDateRangeStats({
       startDate: startDate as string,
-      endDate: endDate as string
+      endDate: endDate as string,
+      groupBy: (groupBy as 'day' | 'week' | 'month') || 'day'
     });
 
     res.json({

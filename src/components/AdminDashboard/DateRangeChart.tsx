@@ -9,9 +9,9 @@ interface DateRangeChartProps {
 const DateRangeChart: React.FC<DateRangeChartProps> = ({ data, groupBy }) => {
   const formatCurrency = (amount: number) => {
     if (amount >= 10000000) {
-      return `₹${(amount / 10000000).toFixed(1)}Cr`;
+      return `₹${Math.round((amount / 10000000) * 10) / 10}Cr`;
     } else if (amount >= 100000) {
-      return `₹${(amount / 100000).toFixed(1)}L`;
+      return `₹${Math.round((amount / 100000) * 10) / 10}L`;
     } else {
       return `₹${amount.toLocaleString()}`;
     }

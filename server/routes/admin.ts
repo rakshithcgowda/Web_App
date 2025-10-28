@@ -17,7 +17,7 @@ const isAdmin = (req: AuthRequest, res: any, next: any) => {
 router.use(isAdmin);
 
 // Get BQC statistics overview
-router.get('/stats/overview', async (req: AuthRequest, res) => {
+router.get('/stats-overview', async (req: AuthRequest, res) => {
   try {
     const { startDate, endDate, groupName } = req.query;
     
@@ -41,7 +41,7 @@ router.get('/stats/overview', async (req: AuthRequest, res) => {
 });
 
 // Get BQC statistics by group
-router.get('/stats/groups', async (req: AuthRequest, res) => {
+router.get('/stats-groups', async (req: AuthRequest, res) => {
   try {
     const { startDate, endDate, groupName } = req.query;
     
@@ -65,7 +65,7 @@ router.get('/stats/groups', async (req: AuthRequest, res) => {
 });
 
 // Get BQC statistics by date range
-router.get('/stats/date-range', async (req: AuthRequest, res) => {
+router.get('/stats-date-range', async (req: AuthRequest, res) => {
   try {
     const { startDate, endDate, groupBy = 'day' } = req.query;
     
@@ -125,7 +125,7 @@ router.get('/bqc-entries', async (req: AuthRequest, res) => {
 });
 
 // Get user statistics
-router.get('/stats/users', async (req: AuthRequest, res) => {
+router.get('/stats-users', async (req: AuthRequest, res) => {
   try {
     const userStats = await database.getUserStats();
     
@@ -143,7 +143,7 @@ router.get('/stats/users', async (req: AuthRequest, res) => {
 });
 
 // Get tender type statistics
-router.get('/stats/tender-types', async (req: AuthRequest, res) => {
+router.get('/stats-tender-types', async (req: AuthRequest, res) => {
   try {
     const { startDate, endDate, groupName } = req.query;
     
@@ -167,7 +167,7 @@ router.get('/stats/tender-types', async (req: AuthRequest, res) => {
 });
 
 // Get financial statistics
-router.get('/stats/financial', async (req: AuthRequest, res) => {
+router.get('/stats-financial', async (req: AuthRequest, res) => {
   try {
     const { startDate, endDate, groupName } = req.query;
     
@@ -216,6 +216,62 @@ router.get('/export', async (req: AuthRequest, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to export data'
+    });
+  }
+});
+
+// User management routes
+router.get('/users', async (req: AuthRequest, res) => {
+  try {
+    const users = await database.getAllUsers();
+    
+    res.json({
+      success: true,
+      data: users
+    });
+  } catch (error) {
+    console.error('Admin users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch users'
+    });
+  }
+});
+
+router.post('/users', async (req: AuthRequest, res) => {
+  try {
+    const { userId, action } = req.body;
+    
+    if (!userId || !action) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID and action are required'
+      });
+    }
+
+    if (action === 'approve') {
+      await database.approveUser(userId, req.userId);
+      res.json({
+        success: true,
+        message: 'User approved successfully'
+      });
+    } else if (action === 'reject') {
+      await database.rejectUser(userId);
+      res.json({
+        success: true,
+        message: 'User rejected and removed'
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid action. Use "approve" or "reject"'
+      });
+    }
+  } catch (error) {
+    console.error('Admin user management error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to manage user'
     });
   }
 });

@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcryptjs';
-import { database } from '../../server/models/database-adapter.js';
+import { database } from '../../server/models/database-adapter';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers
@@ -68,10 +68,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           id: user.id,
           username: user.username,
           email: user.email,
-          fullName: user.full_name
+          fullName: user.full_name,
+          isApproved: user.is_approved
         }
       },
-      message: 'User registered successfully'
+      message: 'User registered successfully. Your account is pending admin approval.'
     });
   } catch (error) {
     console.error('Registration error:', error);
