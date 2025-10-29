@@ -240,6 +240,29 @@ export function useBQC() {
         setError('❌ Cannot generate document: No lots have CEC values greater than 0. Please go to the Preamble tab and enter CEC estimates (both including and excluding GST) for at least one lot. The generated document will show 0.00 values if CEC estimates are not entered.');
         return { success: false, errors: [{ field: 'lots', message: 'CEC estimates required for lots' }] };
       }
+      
+      // Additional warning if CEC values seem low
+      const lowCECValues = bqcData.lots.filter(lot => (lot.cecEstimateInclGst || 0) > 0 && (lot.cecEstimateInclGst || 0) < 0.1);
+      if (lowCECValues.length > 0) {
+        console.warn('⚠️ WARNING: Some lots have very low CEC values (< 0.1 Cr), which might result in 0.00 in the generated document.');
+        console.warn('Low CEC lots:', lowCECValues.map(lot => ({ lotNumber: lot.lotNumber, cec: lot.cecEstimateInclGst })));
+      }
+    }
+
+    // CRITICAL FIX: Auto-save data before generation to ensure latest values are used
+    console.log('🔄 Auto-saving data before document generation...');
+    try {
+      const saveResult = await saveBQCData();
+      if (!saveResult.success) {
+        console.error('❌ Failed to auto-save data before generation:', saveResult.message);
+        setError(`Failed to save data before generation: ${saveResult.message}`);
+        return { success: false, message: saveResult.message };
+      }
+      console.log('✅ Data auto-saved successfully before generation');
+    } catch (error) {
+      console.error('❌ Error during auto-save before generation:', error);
+      setError('Failed to save data before generation. Please try again.');
+      return { success: false, message: 'Failed to save data before generation' };
     }
 
     setIsLoading(true);
@@ -257,12 +280,16 @@ export function useBQC() {
       // Debug: Log the data being sent
       console.log('=== FRONTEND DEBUG - Data being sent to backend ===');
       console.log('BQC Data:', JSON.stringify(bqcData, null, 2));
+      console.log('Evaluation Methodology:', bqcData.evaluationMethodology);
+      console.log('Tender Type:', bqcData.tenderType);
+      
       if (bqcData.lots && bqcData.lots.length > 0) {
         console.log('Lots data being sent:');
         bqcData.lots.forEach((lot, index) => {
           console.log(`  Lot ${index + 1}:`, {
             lotNumber: lot.lotNumber,
             cecEstimateInclGst: lot.cecEstimateInclGst,
+            cecEstimateInclGstType: typeof lot.cecEstimateInclGst,
             cecEstimateExclGst: lot.cecEstimateExclGst,
             contractPeriodText: lot.contractPeriodText,
             contractPeriodMonths: lot.contractPeriodMonths,
@@ -277,13 +304,29 @@ export function useBQC() {
           
           // Check if CEC values are 0
           if (lot.cecEstimateInclGst === 0) {
-            console.warn(`WARNING: Lot ${index + 1} has CEC Estimate = 0 in frontend data!`);
+            console.error(`❌ ERROR: Lot ${index + 1} has CEC Estimate = 0 in frontend data!`);
+            console.error(`This will cause the generated document to show 0.00 values.`);
+            console.error(`Please ensure CEC values are properly entered and saved.`);
           } else {
             console.log(`✅ Lot ${index + 1} has CEC Estimate = ${lot.cecEstimateInclGst}`);
           }
         });
+        
+        // Check if any lot has valid CEC data
+        const hasValidCECData = bqcData.lots.some(lot => (lot.cecEstimateInclGst || 0) > 0);
+        if (!hasValidCECData) {
+          console.error('❌ CRITICAL ERROR: No lots have CEC values > 0!');
+          console.error('This means the generated document will show all 0.00 values.');
+          console.error('Please check:');
+          console.error('1. Are CEC values properly entered in the UI?');
+          console.error('2. Is the data being saved before generation?');
+          console.error('3. Is there a state management issue?');
+        } else {
+          console.log('✅ At least one lot has valid CEC data');
+        }
       } else {
-        console.log('No lots data found!');
+        console.error('❌ ERROR: No lots data found!');
+        console.error('This means the generated document will not have lot-wise tables.');
       }
       
       // Additional debug: Check evaluation methodology
@@ -322,7 +365,7 @@ export function useBQC() {
     } finally {
       setIsLoading(false);
     }
-  }, [bqcData]);
+  }, [bqcData, saveBQCData]);
 
   // Clear form data
   const clearBQCData = useCallback(() => {

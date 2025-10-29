@@ -42,14 +42,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Check if lots data exists and has values
     if (bqcData.lots && bqcData.lots.length > 0) {
       console.log('Lots data:');
-      bqcData.lots.forEach((lot: any, index: number) => {
+      bqcData.lots.forEach((lot, index: number) => {
         // Parse CEC values to ensure they're numbers
         const parsedCecIncl = typeof lot.cecEstimateInclGst === 'string' 
           ? parseFloat(lot.cecEstimateInclGst) || 0 
           : (lot.cecEstimateInclGst || 0);
-        const parsedCecExcl = typeof lot.cecEstimateExclGst === 'string'
-          ? parseFloat(lot.cecEstimateExclGst) || 0
-          : (lot.cecEstimateExclGst || 0);
         
         console.log(`  Lot ${index + 1}:`, {
           lotNumber: lot.lotNumber,
@@ -80,7 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     // Additional debug: Check if we have any non-zero CEC values
-    const hasNonZeroCEC = bqcData.lots?.some((lot: any) => {
+    const hasNonZeroCEC = bqcData.lots?.some((lot) => {
       const parsedCec = typeof lot.cecEstimateInclGst === 'string'
         ? parseFloat(lot.cecEstimateInclGst) || 0
         : (lot.cecEstimateInclGst || 0);
@@ -158,7 +155,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     // Calculate lot-wise values
-    const calculateLotValues = (lots: any[]) => {
+    const calculateLotValues = (lots) => {
       console.log('=== CALCULATE LOT VALUES DEBUG ===');
       console.log('Input lots:', JSON.stringify(lots, null, 2));
       
@@ -166,6 +163,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log(`Processing lot ${index + 1}:`, JSON.stringify(lot, null, 2));
         
         // Parse CEC values - handle both string and number types
+        console.log(`🔍 DEBUG: Parsing CEC for Lot ${index + 1} (${lot.lotNumber})`);
+        console.log(`  Raw cecEstimateInclGst value:`, lot.cecEstimateInclGst);
+        console.log(`  Type of cecEstimateInclGst:`, typeof lot.cecEstimateInclGst);
+        console.log(`  Is number?:`, typeof lot.cecEstimateInclGst === 'number');
+        console.log(`  Is string?:`, typeof lot.cecEstimateInclGst === 'string');
+        
         const cecInclGst = typeof lot.cecEstimateInclGst === 'string' 
           ? parseFloat(lot.cecEstimateInclGst) || 0 
           : (lot.cecEstimateInclGst || 0);
@@ -173,14 +176,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ? parseFloat(lot.cecEstimateExclGst) || 0
           : (lot.cecEstimateExclGst || 0);
         
-        console.log(`Lot ${index + 1} - CEC Incl GST (parsed):`, cecInclGst, '(raw:', lot.cecEstimateInclGst, ')');
-        console.log(`Lot ${index + 1} - CEC Excl GST (parsed):`, cecExclGst, '(raw:', lot.cecEstimateExclGst, ')');
+        console.log(`  Parsed cecInclGst:`, cecInclGst);
+        console.log(`  Parsed cecExclGst:`, cecExclGst);
         
         // Debug: Check if CEC values are actually 0
         if (cecInclGst === 0 || isNaN(cecInclGst)) {
           console.error(`❌ ERROR: Lot ${index + 1} (${lot.lotNumber}) has invalid CEC Estimate = ${lot.cecEstimateInclGst}`);
+          console.error(`  Parsed value: ${cecInclGst}`);
+          console.error(`  Type: ${typeof lot.cecEstimateInclGst}`);
           console.error(`This will cause all calculated values to be 0.`);
           console.error(`Please ensure CEC values are entered properly in the UI.`);
+        } else {
+          console.log(`✅ Lot ${index + 1} has valid CEC value: ${cecInclGst}`);
         }
         
         // Use EXACT same calculation logic as UI (BQCSection.tsx)
@@ -212,16 +219,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const optionB = amountInLakhs * 0.5; // 50% - Two works each
         const optionC = amountInLakhs * 0.4; // 40% - Three works each
         
-        // Calculate turnover (30% of CEC value minus AMC, using individual lot contract period)
-        const lotAMC = lot.hasAmc && lot.amcValue && lot.amcValue > 0 ? lot.amcValue : 0;
-        const turnoverBaseAmount = baseAmount - lotAMC;
-        const baseTurnover = turnoverBaseAmount * 0.3;
-        // FIXED: Use individual lot contract period, not global contract duration
-        const turnoverInCrores = baseTurnover / contractYears;
-        // Convert to Lakhs for display (1 Crore = 100 Lakhs)
-        const turnover = turnoverInCrores * 100;
+        // Calculate turnover - EXACT same as UI (30% of annualized value in Lakhs)
+        // First calculate annualized value in Lakhs (same as UI)
+        const annualizedAmountInCrores = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+        const annualizedValueInLakhs = annualizedAmountInCrores * 100;
+        // Then calculate turnover as 30% of annualized value in Lakhs (EXACT same as UI line 735)
+        const turnover = annualizedValueInLakhs * 0.3;
         
-        console.log(`Lot ${index + 1} - Final calculations:`, {
+        console.log(`=== BACKEND DEBUG: Lot ${index + 1} - Final calculations ===`);
+        console.log('Input values:', {
+          lotNumber: lot.lotNumber,
+          originalCecInclGst: lot.cecEstimateInclGst,
+          parsedCecInclGst: cecInclGst,
+          contractPeriodText: lot.contractPeriodText,
+          contractPeriodMonths: lot.contractPeriodMonths,
+          mseRelaxation: lot.mseRelaxation
+        });
+        console.log('Calculation process:', {
           baseAmount,
           contractMonths,
           contractYears,
@@ -232,26 +246,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           optionB,
           optionC,
           turnover,
-          turnoverInCrores,
-          baseTurnover,
-          // Show conversions
-          optionAInLakhs: Math.round(optionA * 100) / 100,
-          turnoverInLakhs: Math.round(turnover * 100) / 100,
-          // Debug pre-calculated values
+          annualizedValueInLakhs
+        });
+        console.log('Pre-calculated values from frontend:', {
           preCalculatedOptionA: lot.similarWorksOptionA,
           preCalculatedOptionB: lot.similarWorksOptionB,
           preCalculatedOptionC: lot.similarWorksOptionC,
           usingPreCalculated: !!(lot.similarWorksOptionA || lot.similarWorksOptionB || lot.similarWorksOptionC)
         });
+        console.log('=== END BACKEND DEBUG ===');
         
         return {
           ...lot,
-          annualizedValue: annualizedAmount,
+          annualizedValue: annualizedAmount, // Keep in Crores for internal calculations
+          annualizedValueInLakhs: annualizedValueInLakhs, // Store in Lakhs for display (matches UI)
           optionA,
           optionB,
           optionC,
           turnover,
-          turnoverInCrores,
           contractMonths,
           contractYears
         };
@@ -261,22 +273,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Debug: Log lots data before processing
     console.log('=== BEFORE calculateLotValues ===');
     console.log('Number of lots:', bqcData.lots?.length || 0);
-    if (bqcData.lots && bqcData.lots.length > 0) {
-      console.log('Lots summary:', bqcData.lots.map((lot: any) => ({
+    if (!bqcData.lots || bqcData.lots.length === 0) {
+      console.error('❌ CRITICAL ERROR: No lots data found in bqcData!');
+      console.error('bqcData.lots:', bqcData.lots);
+    } else {
+      console.log('Lots summary:', bqcData.lots.map((lot) => ({
         lotNumber: lot.lotNumber,
         cecIncl: lot.cecEstimateInclGst,
         cecInclType: typeof lot.cecEstimateInclGst
       })));
     }
     
+    // Validate lots data exists before processing
+    if (!bqcData.lots || bqcData.lots.length === 0) {
+      console.error('❌ ERROR: Cannot generate document without lots data');
+      return res.status(400).json({
+        success: false,
+        message: 'No lots data found. Please add lots before generating the document.'
+      });
+    }
+    
     // Calculate total values - handle both string and number types
-    const totalCECInclGst = bqcData.lots?.reduce((sum: number, lot: any) => {
+    const totalCECInclGst = bqcData.lots.reduce((sum: number, lot) => {
       const lotCEC = typeof lot.cecEstimateInclGst === 'string'
         ? parseFloat(lot.cecEstimateInclGst) || 0
         : (lot.cecEstimateInclGst || 0);
       return sum + lotCEC;
-    }, 0) || 0;
-    const totalCECExclGst = bqcData.lots?.reduce((sum: number, lot: any) => {
+    }, 0);
+    const totalCECExclGst = bqcData.lots?.reduce((sum: number, lot) => {
       const lotCEC = typeof lot.cecEstimateExclGst === 'string'
         ? parseFloat(lot.cecEstimateExclGst) || 0
         : (lot.cecEstimateExclGst || 0);
@@ -285,16 +309,68 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     console.log('Total CEC Incl GST:', totalCECInclGst);
     console.log('Total CEC Excl GST:', totalCECExclGst);
-    
-    // Calculate total annualized value based on contract duration
-    const contractDurationYears = bqcData.contractDurationYears || 1;
-    const totalAnnualizedValue = contractDurationYears > 1 ? totalCECInclGst / contractDurationYears : totalCECInclGst;
-    const totalTurnoverInCrores = (totalCECInclGst * 0.3) / contractDurationYears;
-    // Convert to Lakhs for display (1 Crore = 100 Lakhs)
-    const totalTurnover = totalTurnoverInCrores * 100;
 
-    // Calculate EMD (5 Lakh for this example)
-    const emdAmount = 5; // Fixed at 5 Lakh as per example
+    // Calculate EMD helper function
+    const calculateEMD = (estimatedValue: number, tenderType: string): number => {
+      // Convert Cr to Lakhs for calculation (1 Cr = 100 Lakhs)
+      const valueInLakhs = estimatedValue * 100;
+      
+      if (tenderType === 'Goods') {
+        // Goods: 50L-100L = Nil, >100L = fixed amounts
+        if (valueInLakhs >= 50 && valueInLakhs <= 100) {
+          return 0; // Nil
+        } else if (valueInLakhs > 100 && valueInLakhs <= 500) {
+          return 2.5; // 2.5 Lakhs
+        } else if (valueInLakhs > 500 && valueInLakhs <= 1000) {
+          return 5; // 5 Lakhs
+        } else if (valueInLakhs > 1000 && valueInLakhs <= 1500) {
+          return 7.5; // 7.5 Lakhs
+        } else if (valueInLakhs > 1500 && valueInLakhs <= 2500) {
+          return 10; // 10 Lakhs
+        } else if (valueInLakhs > 2500) {
+          return 20; // 20 Lakhs
+        }
+        return 0; // For values < 50L
+      }
+      
+      if (tenderType === 'Service') {
+        // Service: 50L-100L = 1L (inclusive), >100L = fixed amounts
+        if (valueInLakhs >= 50 && valueInLakhs <= 100) {
+          return 1; // 1 Lakh
+        } else if (valueInLakhs > 100 && valueInLakhs <= 500) {
+          return 2.5; // 2.5 Lakhs
+        } else if (valueInLakhs > 500 && valueInLakhs <= 1000) {
+          return 5; // 5 Lakhs
+        } else if (valueInLakhs > 1000 && valueInLakhs <= 1500) {
+          return 7.5; // 7.5 Lakhs
+        } else if (valueInLakhs > 1500 && valueInLakhs <= 2500) {
+          return 10; // 10 Lakhs
+        } else if (valueInLakhs > 2500) {
+          return 20; // 20 Lakhs
+        }
+        return 0; // For values < 50L
+      }
+      
+      if (tenderType === 'Works') {
+        // Works: 50L-100L = 1L (inclusive), >100L = fixed amounts
+        if (valueInLakhs >= 50 && valueInLakhs <= 100) {
+          return 1; // 1 Lakh
+        } else if (valueInLakhs > 100 && valueInLakhs <= 500) {
+          return 2.5; // 2.5 Lakhs
+        } else if (valueInLakhs > 500 && valueInLakhs <= 1000) {
+          return 5; // 5 Lakhs
+        } else if (valueInLakhs > 1000 && valueInLakhs <= 1500) {
+          return 7.5; // 7.5 Lakhs
+        } else if (valueInLakhs > 1500 && valueInLakhs <= 2500) {
+          return 10; // 10 Lakhs
+        } else if (valueInLakhs > 2500) {
+          return 20; // 20 Lakhs
+        }
+        return 0; // For values < 50L
+      }
+      
+      return 0; // Default case
+    };
 
     // Process lots with calculated values
     const processedLots = calculateLotValues(bqcData.lots || []);
@@ -756,143 +832,153 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               spacing: { after: 200 },
             }),
 
-            // Supplying Capacity table
+            // Supplying Capacity table with conditional columns
             ...(processedLots && processedLots.length > 0 ? [
-              new Table({
-                width: { size: 100, type: WidthType.PERCENTAGE },
-                borders: {
-                  top: { style: BorderStyle.SINGLE, size: 1 },
-                  bottom: { style: BorderStyle.SINGLE, size: 1 },
-                  left: { style: BorderStyle.SINGLE, size: 1 },
-                  right: { style: BorderStyle.SINGLE, size: 1 },
-                  insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
-                  insideVertical: { style: BorderStyle.SINGLE, size: 1 },
-                },
-                rows: [
-                  // Header row
-                  new TableRow({
-                  children: [
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({ text: "Sr. No.", bold: true, size: 20, font: "Arial" })],
-                        alignment: AlignmentType.CENTER,
-                      })],
-                      width: { size: 10, type: WidthType.PERCENTAGE },
+              (() => {
+                const showNonMse = bqcData.showNonMseCalculations !== false; // Default to true
+                const showMse = bqcData.showMseCalculations !== false; // Default to true
+                
+                // Calculate dynamic widths
+                const remainingWidth = 100 - 10 - 30 - 20; // Total - Sr.No - Description - Quantity
+                const dynamicColumns = (showNonMse ? 1 : 0) + (showMse ? 1 : 0);
+                const dynamicCellWidth = dynamicColumns > 0 ? Math.floor(remainingWidth / dynamicColumns) : 0;
+                
+                return new Table({
+                  width: { size: 100, type: WidthType.PERCENTAGE },
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                    insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
+                    insideVertical: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                  rows: [
+                    // Header row
+                    new TableRow({
+                      children: [
+                        new TableCell({
+                          children: [new Paragraph({
+                            children: [new TextRun({ text: "Sr. No.", bold: true, size: 20, font: "Arial" })],
+                            alignment: AlignmentType.CENTER,
+                          })],
+                          width: { size: 10, type: WidthType.PERCENTAGE },
+                        }),
+                        new TableCell({
+                          children: [new Paragraph({
+                            children: [new TextRun({ text: "Section / Description", bold: true, size: 20, font: "Arial" })],
+                            alignment: AlignmentType.CENTER,
+                          })],
+                          width: { size: 30, type: WidthType.PERCENTAGE },
+                        }),
+                        new TableCell({
+                          children: [new Paragraph({
+                            children: [new TextRun({ text: "Quantity Required", bold: true, size: 20, font: "Arial" })],
+                            alignment: AlignmentType.CENTER,
+                          })],
+                          width: { size: 20, type: WidthType.PERCENTAGE },
+                        }),
+                        ...(showNonMse ? [new TableCell({
+                          children: [new Paragraph({
+                            children: [new TextRun({ text: "Non-MSE (30%)", bold: true, size: 20, font: "Arial" })],
+                            alignment: AlignmentType.CENTER,
+                          })],
+                          width: { size: dynamicCellWidth, type: WidthType.PERCENTAGE },
+                        })] : []),
+                        ...(showMse ? [new TableCell({
+                          children: [new Paragraph({
+                            children: [new TextRun({ text: "MSE (15%)", bold: true, size: 20, font: "Arial" })],
+                            alignment: AlignmentType.CENTER,
+                          })],
+                          width: { size: dynamicCellWidth, type: WidthType.PERCENTAGE },
+                        })] : []),
+                      ],
                     }),
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({ text: "Section / Description", bold: true, size: 20, font: "Arial" })],
-                        alignment: AlignmentType.CENTER,
-                      })],
-                      width: { size: 30, type: WidthType.PERCENTAGE },
+                    // Data rows
+                    ...processedLots.map((lot, index) => {
+                      const quantityRequired = lot.quantitySupplied || 0;
+                      const nonMseRequirement = Math.round(quantityRequired * 0.3);
+                      const mseRequirement = Math.round(quantityRequired * 0.15); // 15% for MSE
+                      
+                      return new TableRow({
+                        children: [
+                          new TableCell({
+                            children: [new Paragraph({
+                              children: [new TextRun({ text: `${index + 1}`, size: 20, font: "Arial" })],
+                              alignment: AlignmentType.CENTER,
+                            })],
+                          }),
+                          new TableCell({
+                            children: [new Paragraph({
+                              children: [new TextRun({ text: `${lot.lotNumber || `LOT-${index + 1}`}`, size: 20, font: "Arial" })],
+                              alignment: AlignmentType.LEFT,
+                            })],
+                          }),
+                          new TableCell({
+                            children: [new Paragraph({
+                              children: [new TextRun({ text: `${quantityRequired.toLocaleString()}`, size: 20, font: "Arial" })],
+                              alignment: AlignmentType.CENTER,
+                            })],
+                          }),
+                          ...(showNonMse ? [new TableCell({
+                            children: [new Paragraph({
+                              children: [new TextRun({ text: `${nonMseRequirement.toLocaleString()}`, size: 20, font: "Arial" })],
+                              alignment: AlignmentType.CENTER,
+                            })],
+                          })] : []),
+                          ...(showMse ? [new TableCell({
+                            children: [new Paragraph({
+                              children: [new TextRun({ text: `${mseRequirement.toLocaleString()}`, size: 20, font: "Arial" })],
+                              alignment: AlignmentType.CENTER,
+                            })],
+                          })] : []),
+                        ],
+                      });
                     }),
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({ text: "Quantity Required", bold: true, size: 20, font: "Arial" })],
-                        alignment: AlignmentType.CENTER,
-                      })],
-                      width: { size: 20, type: WidthType.PERCENTAGE },
-                    }),
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({ text: "Non-MSE (30%)", bold: true, size: 20, font: "Arial" })],
-                        alignment: AlignmentType.CENTER,
-                      })],
-                      width: { size: 20, type: WidthType.PERCENTAGE },
-                    }),
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({ text: "MSE (15%)", bold: true, size: 20, font: "Arial" })],
-                        alignment: AlignmentType.CENTER,
-                      })],
-                      width: { size: 20, type: WidthType.PERCENTAGE },
-                    }),
+                    // Total row
+                    (() => {
+                      const totalQuantity = processedLots.reduce((sum, lot) => sum + (lot.quantitySupplied || 0), 0);
+                      const totalNonMse = Math.round(totalQuantity * 0.3);
+                      const totalMse = Math.round(totalQuantity * 0.15);
+                      
+                      return new TableRow({
+                        children: [
+                          new TableCell({
+                            children: [new Paragraph({
+                              children: [new TextRun({ text: `${processedLots.length + 1}`, size: 20, font: "Arial" })],
+                              alignment: AlignmentType.CENTER,
+                            })],
+                          }),
+                          new TableCell({
+                            children: [new Paragraph({
+                              children: [new TextRun({ text: "TOTAL FOR ALL LOTS", bold: true, size: 20, font: "Arial" })],
+                              alignment: AlignmentType.LEFT,
+                            })],
+                          }),
+                          new TableCell({
+                            children: [new Paragraph({
+                              children: [new TextRun({ text: `${totalQuantity.toLocaleString()}`, size: 20, font: "Arial" })],
+                              alignment: AlignmentType.CENTER,
+                            })],
+                          }),
+                          ...(showNonMse ? [new TableCell({
+                            children: [new Paragraph({
+                              children: [new TextRun({ text: `${totalNonMse.toLocaleString()}`, size: 20, font: "Arial" })],
+                              alignment: AlignmentType.CENTER,
+                            })],
+                          })] : []),
+                          ...(showMse ? [new TableCell({
+                            children: [new Paragraph({
+                              children: [new TextRun({ text: `${totalMse.toLocaleString()}`, size: 20, font: "Arial" })],
+                              alignment: AlignmentType.CENTER,
+                            })],
+                          })] : []),
+                        ],
+                      });
+                    })(),
                   ],
-                }),
-                // Data rows
-                ...processedLots.map((lot, index) => {
-                  const quantityRequired = lot.quantitySupplied || 0;
-                  const nonMseRequirement = Math.round(quantityRequired * 0.3);
-                  const mseRequirement = Math.round(quantityRequired * 0.15); // 15% for MSE
-                  
-                  return new TableRow({
-                    children: [
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({ text: `${index + 1}`, size: 20, font: "Arial" })],
-                          alignment: AlignmentType.CENTER,
-                        })],
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({ text: `${lot.lotNumber || `LOT-${index + 1}`}`, size: 20, font: "Arial" })],
-                          alignment: AlignmentType.LEFT,
-                        })],
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({ text: `${quantityRequired.toLocaleString()}`, size: 20, font: "Arial" })],
-                          alignment: AlignmentType.CENTER,
-                        })],
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({ text: `${nonMseRequirement.toLocaleString()}`, size: 20, font: "Arial" })],
-                          alignment: AlignmentType.CENTER,
-                        })],
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({ text: `${mseRequirement.toLocaleString()}`, size: 20, font: "Arial" })],
-                          alignment: AlignmentType.CENTER,
-                        })],
-                      }),
-                    ],
-                  });
-                }),
-                // Total row
-                (() => {
-                  const totalQuantity = processedLots.reduce((sum, lot) => sum + (lot.quantitySupplied || 0), 0);
-                  const totalNonMse = Math.round(totalQuantity * 0.3);
-                  const totalMse = Math.round(totalQuantity * 0.15);
-                  
-                  return new TableRow({
-                    children: [
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({ text: `${processedLots.length + 1}`, size: 20, font: "Arial" })],
-                          alignment: AlignmentType.CENTER,
-                        })],
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({ text: "TOTAL FOR ALL LOTS", bold: true, size: 20, font: "Arial" })],
-                          alignment: AlignmentType.LEFT,
-                        })],
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({ text: `${totalQuantity.toLocaleString()}`, size: 20, font: "Arial" })],
-                          alignment: AlignmentType.CENTER,
-                        })],
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({ text: `${totalNonMse.toLocaleString()}`, size: 20, font: "Arial" })],
-                          alignment: AlignmentType.CENTER,
-                        })],
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({ text: `${totalMse.toLocaleString()}`, size: 20, font: "Arial" })],
-                          alignment: AlignmentType.CENTER,
-                        })],
-                      }),
-                    ],
-                  });
-                })(),
-                ],
-              }),
+                });
+              })(),
             ] : []),
 
             new Paragraph({
@@ -1041,32 +1127,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               }),
               // Data rows for each lot
               ...processedLots.map((lot, index) => {
-                // Use pre-calculated values from calculateLotValues function
-                const optionA = lot.optionA || 0;
-                const optionB = lot.optionB || 0;
-                const optionC = lot.optionC || 0;
+                // Recalculate on-the-fly to ensure values are correct
+                const baseAmount = typeof lot.cecEstimateInclGst === 'string' 
+                  ? parseFloat(lot.cecEstimateInclGst) || 0 
+                  : (lot.cecEstimateInclGst || 0);
+                
+                // Parse contract period
+                let contractMonths = lot.contractPeriodMonths || 12;
+                if (lot.contractPeriodText) {
+                  const textMatch = lot.contractPeriodText.match(/(\d+)/);
+                  if (textMatch) {
+                    contractMonths = parseInt(textMatch[1]);
+                    if (lot.contractPeriodText.toLowerCase().includes('year')) {
+                      contractMonths = contractMonths * 12;
+                    }
+                  }
+                }
+                
+                const contractYears = contractMonths / 12;
+                const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+                const finalAmount = lot.mseRelaxation ? annualizedAmount * 0.85 : annualizedAmount;
+                const amountInLakhs = finalAmount * 100;
+                
+                const optionA = amountInLakhs * 0.8;
+                const optionB = amountInLakhs * 0.5;
+                const optionC = amountInLakhs * 0.4;
                 
                 // Calculate MSE values (15% reduction)
                 const mseOptionA = optionA * 0.85;
                 const mseOptionB = optionB * 0.85;
                 const mseOptionC = optionC * 0.85;
                 
-                console.log(`Technical Criteria Table - Lot ${index + 1}:`, {
+                console.log(`🔍 Technical Criteria Table - Lot ${index + 1}:`, {
                   lotNumber: lot.lotNumber,
                   cecEstimateInclGst: lot.cecEstimateInclGst,
+                  baseAmount,
+                  amountInLakhs,
                   optionA,
                   optionB,
                   optionC,
-                  mseOptionA,
-                  mseOptionB,
-                  mseOptionC,
-                  formattedA: Math.round((optionA || 0) * 100) / 100,
-                  formattedB: Math.round((optionB || 0) * 100) / 100,
-                  formattedC: Math.round((optionC || 0) * 100) / 100,
-                  // Debug: Check if values are actually 0
-                  isOptionAZero: optionA === 0,
-                  isOptionBZero: optionB === 0,
-                  isOptionCZero: optionC === 0
+                  formattedA: (Math.round(optionA * 100) / 100).toFixed(2),
+                  formattedB: (Math.round(optionB * 100) / 100).toFixed(2),
+                  formattedC: (Math.round(optionC * 100) / 100).toFixed(2)
                 });
                 
                 return new TableRow({
@@ -1085,19 +1187,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     }),
                     new TableCell({
                       children: [new Paragraph({
-                        children: [new TextRun({ text: `${(Math.round((optionA || 0) * 100) / 100).toFixed(2)}`, size: 20, font: "Arial" })],
+                        children: [new TextRun({ text: `${(Math.round(optionA * 100) / 100).toFixed(2)}`, size: 20, font: "Arial" })],
                         alignment: AlignmentType.CENTER,
                       })],
                     }),
                     new TableCell({
                       children: [new Paragraph({
-                        children: [new TextRun({ text: `${(Math.round((optionB || 0) * 100) / 100).toFixed(2)}`, size: 20, font: "Arial" })],
+                        children: [new TextRun({ text: `${(Math.round(optionB * 100) / 100).toFixed(2)}`, size: 20, font: "Arial" })],
                         alignment: AlignmentType.CENTER,
                       })],
                     }),
                     new TableCell({
                       children: [new Paragraph({
-                        children: [new TextRun({ text: `${(Math.round((optionC || 0) * 100) / 100).toFixed(2)}`, size: 20, font: "Arial" })],
+                        children: [new TextRun({ text: `${(Math.round(optionC * 100) / 100).toFixed(2)}`, size: 20, font: "Arial" })],
                         alignment: AlignmentType.CENTER,
                       })],
                     }),
@@ -1257,23 +1359,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   }),
                 ],
               }),
-              // Data rows for each lot
+              // Data rows for each lot - Use EXACT same values as displayed in UI
               ...processedLots.map((lot, index) => {
-                // Use pre-calculated values from calculateLotValues function
-                const annualizedValue = lot.annualizedValue || 0;
-                const turnoverRequirement = lot.turnover || 0;
+                // Recalculate using EXACT same logic as UI (BQCSection.tsx lines 711-735)
+                const baseAmount = typeof lot.cecEstimateInclGst === 'string' 
+                  ? parseFloat(lot.cecEstimateInclGst) || 0 
+                  : (lot.cecEstimateInclGst || 0);
                 
-                // Convert annualized value to Lakhs for display (1 Crore = 100 Lakhs)
-                const annualizedValueInLakhs = annualizedValue * 100;
+                // Parse contract period - EXACT same as UI
+                let contractMonths = lot.contractPeriodMonths || 12;
+                if (lot.contractPeriodText) {
+                  const textMatch = lot.contractPeriodText.match(/(\d+)/);
+                  if (textMatch) {
+                    contractMonths = parseInt(textMatch[1]);
+                    if (lot.contractPeriodText.toLowerCase().includes('year')) {
+                      contractMonths = contractMonths * 12;
+                    }
+                  }
+                }
+                
+                const contractYears = contractMonths / 12;
+                // EXACT same calculation as UI line 729
+                const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+                // EXACT same conversion as UI line 732
+                const annualizedValueInLakhs = annualizedAmount * 100;
+                // EXACT same calculation as UI line 735
+                const turnoverRequirement = annualizedValueInLakhs * 0.3;
+                
+                // EXACT same formatting as UI lines 746 and 749
+                const formattedAnnualized = annualizedValueInLakhs > 0 ? Math.round(annualizedValueInLakhs * 100) / 100 : 0;
+                const formattedTurnover = turnoverRequirement > 0 ? Math.round(turnoverRequirement * 100) / 100 : 0;
                 
                 console.log(`Financial Criteria Table - Lot ${index + 1}:`, {
                   lotNumber: lot.lotNumber,
-                  cecEstimateInclGst: lot.cecEstimateInclGst,
-                  annualizedValue,
+                  cecEstimateInclGst: baseAmount,
                   annualizedValueInLakhs,
                   turnoverRequirement,
-                  formattedAnnualized: Math.round((annualizedValueInLakhs || 0) * 100) / 100,
-                  formattedTurnover: Math.round((turnoverRequirement || 0) * 100) / 100
+                  formattedAnnualized,
+                  formattedTurnover
                 });
                 
                 return new TableRow({
@@ -1292,31 +1415,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     }),
                     new TableCell({
                       children: [new Paragraph({
-                        children: [new TextRun({ text: `${(Math.round((annualizedValueInLakhs || 0) * 100) / 100).toFixed(2)}`, size: 20, font: "Arial" })],
+                        children: [new TextRun({ text: `${formattedAnnualized.toFixed(2)}`, size: 20, font: "Arial" })],
                         alignment: AlignmentType.CENTER,
                       })],
                     }),
                     new TableCell({
                       children: [new Paragraph({
-                        children: [new TextRun({ text: `${(Math.round((turnoverRequirement || 0) * 100) / 100).toFixed(2)}`, size: 20, font: "Arial" })],
+                        children: [new TextRun({ text: `${formattedTurnover.toFixed(2)}`, size: 20, font: "Arial" })],
                         alignment: AlignmentType.CENTER,
                       })],
                     }),
                   ],
                 });
               }),
-              // Total row - Calculate totals from processed lots
+              // Total row - Calculate totals using EXACT same logic as UI
               (() => {
-                let totalAnnualizedValue = 0;
+                let totalAnnualizedValueInLakhs = 0;
                 let totalTurnover = 0;
                 
                 processedLots.forEach(lot => {
-                  totalAnnualizedValue += lot.annualizedValue || 0;
-                  totalTurnover += lot.turnover || 0;
+                  // Recalculate for each lot using EXACT same logic as UI
+                  const baseAmount = typeof lot.cecEstimateInclGst === 'string' 
+                    ? parseFloat(lot.cecEstimateInclGst) || 0 
+                    : (lot.cecEstimateInclGst || 0);
+                  
+                  let contractMonths = lot.contractPeriodMonths || 12;
+                  if (lot.contractPeriodText) {
+                    const textMatch = lot.contractPeriodText.match(/(\d+)/);
+                    if (textMatch) {
+                      contractMonths = parseInt(textMatch[1]);
+                      if (lot.contractPeriodText.toLowerCase().includes('year')) {
+                        contractMonths = contractMonths * 12;
+                      }
+                    }
+                  }
+                  
+                  const contractYears = contractMonths / 12;
+                  const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+                  const annualizedValueInLakhs = annualizedAmount * 100;
+                  const turnoverRequirement = annualizedValueInLakhs * 0.3;
+                  
+                  totalAnnualizedValueInLakhs += annualizedValueInLakhs;
+                  totalTurnover += turnoverRequirement;
                 });
                 
-                // Convert total annualized value to Lakhs for display (1 Crore = 100 Lakhs)
-                const totalAnnualizedValueInLakhs = totalAnnualizedValue * 100;
+                // EXACT same formatting as UI
+                const formattedTotalAnnualized = totalAnnualizedValueInLakhs > 0 ? Math.round(totalAnnualizedValueInLakhs * 100) / 100 : 0;
+                const formattedTotalTurnover = totalTurnover > 0 ? Math.round(totalTurnover * 100) / 100 : 0;
                 
                 return new TableRow({
                   children: [
@@ -1334,13 +1479,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     }),
                     new TableCell({
                       children: [new Paragraph({
-                        children: [new TextRun({ text: `${(Math.round((totalAnnualizedValueInLakhs || 0) * 100) / 100).toFixed(2)}`, bold: true, size: 20, font: "Arial" })],
+                        children: [new TextRun({ text: `${formattedTotalAnnualized.toFixed(2)}`, bold: true, size: 20, font: "Arial" })],
                         alignment: AlignmentType.CENTER,
                       })],
                     }),
                     new TableCell({
                       children: [new Paragraph({
-                        children: [new TextRun({ text: `${(Math.round((totalTurnover || 0) * 100) / 100).toFixed(2)}`, bold: true, size: 20, font: "Arial" })],
+                        children: [new TextRun({ text: `${formattedTotalTurnover.toFixed(2)}`, bold: true, size: 20, font: "Arial" })],
                         alignment: AlignmentType.CENTER,
                       })],
                     }),
@@ -1498,16 +1643,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   ? parseFloat(lot.cecEstimateInclGst) || 0
                   : (lot.cecEstimateInclGst || 0);
                 
-                // EMD amounts as per the specified criteria: [2.5, 1, 0, 1, 1] for Lot 1, 2, 3, 4, 5
-                const emdAmounts = [2.5, 1, 0, 1, 1];
-                const emdAmount = index < emdAmounts.length ? emdAmounts[index] : 0;
+                // Convert CEC to Lakhs for display (1 Crore = 100 Lakhs)
+                // lotCEC is in Crores, so multiply by 100 to get Lakhs
+                const cecInLakhs = lotCEC * 100;
+                const formattedCecInLakhs = lotCEC > 0 ? (Math.round(cecInLakhs * 100) / 100).toFixed(2) : '0.00';
+                
+                const emdAmount = calculateEMD(lotCEC, bqcData.tenderType || 'Goods');
                 
                 console.log(`EMD Table - Lot ${index + 1}:`, {
                   lotNumber: lot.lotNumber,
                   cecEstimateInclGst: lot.cecEstimateInclGst,
                   lotCEC,
+                  cecInLakhs,
+                  formattedCecInLakhs,
                   emdAmount,
-                  cecInLakhs: lotCEC * 100,
                   cecRawType: typeof lot.cecEstimateInclGst
                 });
                 
@@ -1527,7 +1676,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     }),
                     new TableCell({
                       children: [new Paragraph({
-                        children: [new TextRun({ text: `${(Math.round((lotCEC * 100) * 100) / 100).toFixed(2)}`, size: 20, font: "Arial" })],
+                        children: [new TextRun({ text: `${formattedCecInLakhs}`, size: 20, font: "Arial" })],
                         alignment: AlignmentType.CENTER,
                       })],
                     }),
@@ -1540,21 +1689,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   ],
                 });
               }),
-              // Total row
+              // Total row - Calculate totals using EXACT same formatting
               (() => {
-                let totalCEC = 0;
+                let totalCECInCrores = 0;
                 let totalEMD = 0;
                 
-                // EMD amounts as per the specified criteria: [2.5, 1, 0, 1, 1] for Lot 1, 2, 3, 4, 5
-                const emdAmounts = [2.5, 1, 0, 1, 1];
-                
-                processedLots.forEach((lot, index) => {
-                  const lotCEC = lot.cecEstimateInclGst || 0;
-                  const emdAmount = index < emdAmounts.length ? emdAmounts[index] : 0;
+                processedLots.forEach((lot) => {
+                  const lotCEC = typeof lot.cecEstimateInclGst === 'string'
+                    ? parseFloat(lot.cecEstimateInclGst) || 0
+                    : (lot.cecEstimateInclGst || 0);
                   
-                  totalCEC += lotCEC;
+                  // Calculate EMD for this lot using the same logic
+                  const emdAmount = calculateEMD(lotCEC, bqcData.tenderType || 'Goods');
+                  
+                  totalCECInCrores += lotCEC;
                   totalEMD += emdAmount;
                 });
+                
+                // Convert total CEC to Lakhs for display (1 Crore = 100 Lakhs)
+                const totalCecInLakhs = totalCECInCrores * 100;
+                const formattedTotalCecInLakhs = totalCECInCrores > 0 ? (Math.round(totalCecInLakhs * 100) / 100).toFixed(2) : '0.00';
                 
                 return new TableRow({
                   children: [
@@ -1572,7 +1726,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     }),
                     new TableCell({
                       children: [new Paragraph({
-                        children: [new TextRun({ text: `${(Math.round((totalCEC * 100) * 100) / 100).toFixed(2)}`, bold: true, size: 20, font: "Arial" })],
+                        children: [new TextRun({ text: `${formattedTotalCecInLakhs}`, bold: true, size: 20, font: "Arial" })],
                         alignment: AlignmentType.CENTER,
                       })],
                     }),

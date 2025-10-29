@@ -121,6 +121,9 @@ export interface BQCData {
   pastPerformanceExplanatoryNote?: string;
   // MSE Relaxation for Past Performance Requirement
   pastPerformanceMseRelaxation?: boolean;
+  // Supplying Capacity visibility toggles
+  showNonMseCalculations?: boolean;
+  showMseCalculations?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

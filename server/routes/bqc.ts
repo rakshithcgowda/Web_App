@@ -1579,142 +1579,152 @@ router.post('/generate', async (req: AuthRequest, res) => {
               spacing: { after: 200 },
             }),
 
-            // Supplying Capacity table
-            new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              borders: {
-                top: { style: BorderStyle.SINGLE, size: 1 },
-                bottom: { style: BorderStyle.SINGLE, size: 1 },
-                left: { style: BorderStyle.SINGLE, size: 1 },
-                right: { style: BorderStyle.SINGLE, size: 1 },
-                insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
-                insideVertical: { style: BorderStyle.SINGLE, size: 1 },
-              },
-              rows: [
-                // Header row
-                new TableRow({
-                  children: [
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({ text: "Sr. No.", bold: true, size: 20, font: "Arial" })],
-                        alignment: AlignmentType.CENTER,
-                      })],
-                      width: { size: 10, type: WidthType.PERCENTAGE },
-                    }),
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({ text: "Section / Description", bold: true, size: 20, font: "Arial" })],
-                        alignment: AlignmentType.CENTER,
-                      })],
-                      width: { size: 30, type: WidthType.PERCENTAGE },
-                    }),
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({ text: "Quantity Required", bold: true, size: 20, font: "Arial" })],
-                        alignment: AlignmentType.CENTER,
-                      })],
-                      width: { size: 20, type: WidthType.PERCENTAGE },
-                    }),
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({ text: "Non-MSE (30%)", bold: true, size: 20, font: "Arial" })],
-                        alignment: AlignmentType.CENTER,
-                      })],
-                      width: { size: 20, type: WidthType.PERCENTAGE },
-                    }),
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({ text: "MSE (15%)", bold: true, size: 20, font: "Arial" })],
-                        alignment: AlignmentType.CENTER,
-                      })],
-                      width: { size: 20, type: WidthType.PERCENTAGE },
-                    }),
-                  ],
-                }),
-                // Data rows
-                ...bqcData.lots.map((lot: LotData, index: number) => {
-                  const quantityRequired = lot.quantitySupplied || 0;
-                  const nonMseRequirement = Math.round(quantityRequired * 0.3);
-                  const mseRequirement = Math.round(quantityRequired * 0.15); // 15% for MSE
-                  
-                  return new TableRow({
+            // Supplying Capacity table with conditional columns
+            (() => {
+              const showNonMse = bqcData.showNonMseCalculations !== false; // Default to true
+              const showMse = bqcData.showMseCalculations !== false; // Default to true
+              
+              // Calculate dynamic widths
+              const remainingWidth = 100 - 10 - 30 - 20; // Total - Sr.No - Description - Quantity
+              const dynamicColumns = (showNonMse ? 1 : 0) + (showMse ? 1 : 0);
+              const dynamicCellWidth = dynamicColumns > 0 ? Math.floor(remainingWidth / dynamicColumns) : 0;
+              
+              return new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                borders: {
+                  top: { style: BorderStyle.SINGLE, size: 1 },
+                  bottom: { style: BorderStyle.SINGLE, size: 1 },
+                  left: { style: BorderStyle.SINGLE, size: 1 },
+                  right: { style: BorderStyle.SINGLE, size: 1 },
+                  insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
+                  insideVertical: { style: BorderStyle.SINGLE, size: 1 },
+                },
+                rows: [
+                  // Header row
+                  new TableRow({
                     children: [
                       new TableCell({
                         children: [new Paragraph({
-                          children: [new TextRun({ text: `${index + 1}`, size: 20, font: "Arial" })],
+                          children: [new TextRun({ text: "Sr. No.", bold: true, size: 20, font: "Arial" })],
                           alignment: AlignmentType.CENTER,
                         })],
+                        width: { size: 10, type: WidthType.PERCENTAGE },
                       }),
                       new TableCell({
                         children: [new Paragraph({
-                          children: [new TextRun({ text: `${lot.lotNumber || `LOT-${index + 1}`}`, size: 20, font: "Arial" })],
-                          alignment: AlignmentType.LEFT,
+                          children: [new TextRun({ text: "Section / Description", bold: true, size: 20, font: "Arial" })],
+                          alignment: AlignmentType.CENTER,
                         })],
+                        width: { size: 30, type: WidthType.PERCENTAGE },
                       }),
                       new TableCell({
                         children: [new Paragraph({
-                          children: [new TextRun({ text: `${quantityRequired.toLocaleString()}`, size: 20, font: "Arial" })],
+                          children: [new TextRun({ text: "Quantity Required", bold: true, size: 20, font: "Arial" })],
                           alignment: AlignmentType.CENTER,
                         })],
+                        width: { size: 20, type: WidthType.PERCENTAGE },
                       }),
-                      new TableCell({
+                      ...(showNonMse ? [new TableCell({
                         children: [new Paragraph({
-                          children: [new TextRun({ text: `${nonMseRequirement.toLocaleString()}`, size: 20, font: "Arial" })],
+                          children: [new TextRun({ text: "Non-MSE (30%)", bold: true, size: 20, font: "Arial" })],
                           alignment: AlignmentType.CENTER,
                         })],
-                      }),
-                      new TableCell({
+                        width: { size: dynamicCellWidth, type: WidthType.PERCENTAGE },
+                      })] : []),
+                      ...(showMse ? [new TableCell({
                         children: [new Paragraph({
-                          children: [new TextRun({ text: `${mseRequirement.toLocaleString()}`, size: 20, font: "Arial" })],
+                          children: [new TextRun({ text: "MSE (15%)", bold: true, size: 20, font: "Arial" })],
                           alignment: AlignmentType.CENTER,
                         })],
-                      }),
+                        width: { size: dynamicCellWidth, type: WidthType.PERCENTAGE },
+                      })] : []),
                     ],
-                  });
-                }),
-                // Total row
-                (() => {
-                  const totalQuantity = bqcData.lots.reduce((sum: number, lot: LotData) => sum + (lot.quantitySupplied || 0), 0);
-                  const totalNonMse = Math.round(totalQuantity * 0.3);
-                  const totalMse = Math.round(totalQuantity * 0.15);
-                  
-                  return new TableRow({
-                    children: [
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({ text: `${bqcData.lots.length + 1}`, size: 20, font: "Arial" })],
-                          alignment: AlignmentType.CENTER,
-                        })],
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({ text: "TOTAL FOR ALL LOTS", bold: true, size: 20, font: "Arial" })],
-                          alignment: AlignmentType.LEFT,
-                        })],
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({ text: `${totalQuantity.toLocaleString()}`, size: 20, font: "Arial" })],
-                          alignment: AlignmentType.CENTER,
-                        })],
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({ text: `${totalNonMse.toLocaleString()}`, size: 20, font: "Arial" })],
-                          alignment: AlignmentType.CENTER,
-                        })],
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({ text: `${totalMse.toLocaleString()}`, size: 20, font: "Arial" })],
-                          alignment: AlignmentType.CENTER,
-                        })],
-                      }),
-                    ],
-                  });
-                })(),
-              ],
-            }),
+                  }),
+                  // Data rows
+                  ...bqcData.lots.map((lot: LotData, index: number) => {
+                    const quantityRequired = lot.quantitySupplied || 0;
+                    const nonMseRequirement = Math.round(quantityRequired * 0.3);
+                    const mseRequirement = Math.round(quantityRequired * 0.15); // 15% for MSE
+                    
+                    return new TableRow({
+                      children: [
+                        new TableCell({
+                          children: [new Paragraph({
+                            children: [new TextRun({ text: `${index + 1}`, size: 20, font: "Arial" })],
+                            alignment: AlignmentType.CENTER,
+                          })],
+                        }),
+                        new TableCell({
+                          children: [new Paragraph({
+                            children: [new TextRun({ text: `${lot.lotNumber || `LOT-${index + 1}`}`, size: 20, font: "Arial" })],
+                            alignment: AlignmentType.LEFT,
+                          })],
+                        }),
+                        new TableCell({
+                          children: [new Paragraph({
+                            children: [new TextRun({ text: `${quantityRequired.toLocaleString()}`, size: 20, font: "Arial" })],
+                            alignment: AlignmentType.CENTER,
+                          })],
+                        }),
+                        ...(showNonMse ? [new TableCell({
+                          children: [new Paragraph({
+                            children: [new TextRun({ text: `${nonMseRequirement.toLocaleString()}`, size: 20, font: "Arial" })],
+                            alignment: AlignmentType.CENTER,
+                          })],
+                        })] : []),
+                        ...(showMse ? [new TableCell({
+                          children: [new Paragraph({
+                            children: [new TextRun({ text: `${mseRequirement.toLocaleString()}`, size: 20, font: "Arial" })],
+                            alignment: AlignmentType.CENTER,
+                          })],
+                        })] : []),
+                      ],
+                    });
+                  }),
+                  // Total row
+                  (() => {
+                    const totalQuantity = bqcData.lots.reduce((sum: number, lot: LotData) => sum + (lot.quantitySupplied || 0), 0);
+                    const totalNonMse = Math.round(totalQuantity * 0.3);
+                    const totalMse = Math.round(totalQuantity * 0.15);
+                    
+                    return new TableRow({
+                      children: [
+                        new TableCell({
+                          children: [new Paragraph({
+                            children: [new TextRun({ text: `${bqcData.lots.length + 1}`, size: 20, font: "Arial" })],
+                            alignment: AlignmentType.CENTER,
+                          })],
+                        }),
+                        new TableCell({
+                          children: [new Paragraph({
+                            children: [new TextRun({ text: "TOTAL FOR ALL LOTS", bold: true, size: 20, font: "Arial" })],
+                            alignment: AlignmentType.LEFT,
+                          })],
+                        }),
+                        new TableCell({
+                          children: [new Paragraph({
+                            children: [new TextRun({ text: `${totalQuantity.toLocaleString()}`, size: 20, font: "Arial" })],
+                            alignment: AlignmentType.CENTER,
+                          })],
+                        }),
+                        ...(showNonMse ? [new TableCell({
+                          children: [new Paragraph({
+                            children: [new TextRun({ text: `${totalNonMse.toLocaleString()}`, size: 20, font: "Arial" })],
+                            alignment: AlignmentType.CENTER,
+                          })],
+                        })] : []),
+                        ...(showMse ? [new TableCell({
+                          children: [new Paragraph({
+                            children: [new TextRun({ text: `${totalMse.toLocaleString()}`, size: 20, font: "Arial" })],
+                            alignment: AlignmentType.CENTER,
+                          })],
+                        })] : []),
+                      ],
+                    });
+                  })(),
+                ],
+              });
+            })(),
 
             new Paragraph({
               children: [
@@ -2122,7 +2132,19 @@ router.post('/generate', async (req: AuthRequest, res) => {
                 }),
                 // Data rows for each lot
                 ...bqcData.lots.map((lot: LotData, index: number) => {
+                  console.log(`🔍 DEBUG: Processing lot ${index + 1} (${lot.lotNumber}) for Technical Criteria - Similar Works`);
+                  console.log(`  Raw cecEstimateInclGst:`, lot.cecEstimateInclGst);
+                  console.log(`  Type:`, typeof lot.cecEstimateInclGst);
+                  console.log(`  Is number?:`, typeof lot.cecEstimateInclGst === 'number');
+                  console.log(`  Is undefined?:`, lot.cecEstimateInclGst === undefined);
+                  console.log(`  Is null?:`, lot.cecEstimateInclGst === null);
+                  console.log(`  Is 0?:`, lot.cecEstimateInclGst === 0);
                   const baseAmount = lot.cecEstimateInclGst || 0;
+                  console.log(`  Parsed baseAmount:`, baseAmount);
+                  if (baseAmount === 0) {
+                    console.error(`❌ ERROR: Lot ${index + 1} has baseAmount = 0. This will cause all calculations to be 0.`);
+                    console.error(`  Original value was:`, lot.cecEstimateInclGst);
+                  }
                   
                   // Parse contract period from text or use numeric value
                   let contractMonths = lot.contractPeriodMonths || 12;
@@ -2140,10 +2162,15 @@ router.post('/generate', async (req: AuthRequest, res) => {
                   const contractYears = contractMonths / 12;
                   const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
                   
+                  console.log(`  contractYears:`, contractYears);
+                  console.log(`  annualizedAmount:`, annualizedAmount);
+                  
                   // Standard values (no MSE reduction)
                   const optionA = annualizedAmount * 0.8; // 80% - One work
                   const optionB = annualizedAmount * 0.5; // 50% - Two works each
                   const optionC = annualizedAmount * 0.4; // 40% - Three works each
+                  
+                  console.log(`  Final values - optionA: ${optionA}, optionB: ${optionB}, optionC: ${optionC}`);
                   
                   return new TableRow({
                     children: [

@@ -118,10 +118,24 @@ export function OtherSection({ data, onChange, calculatedValues }: OtherSectionP
           
           {data.evaluationMethodology === 'least cash outflow' ? (
             /* least cash outflow - Show calculated EMD */
-            <div className="bg-yellow-50 p-4 rounded-lg">
-              <p className="text-lg font-semibold text-yellow-900">
-                EMD: {calculatedValues.emdAmount === 0 ? 'Nil' : formatCurrency(calculatedValues.emdAmount, 'Lacs')}
-              </p>
+            <div className="space-y-4">
+              <div className="bg-yellow-50 p-4 rounded-lg">
+                <p className="text-lg font-semibold text-yellow-900">
+                  EMD: {calculatedValues.emdAmount === 0 ? 'Nil' : formatCurrency(calculatedValues.emdAmount, 'Lacs')}
+                </p>
+              </div>
+              <div className="bg-blue-100 border border-blue-300 rounded-lg p-4">
+                <div className="flex items-center space-x-2 mb-2">
+                  <div className="text-blue-600">ℹ️</div>
+                  <p className="text-blue-800 font-medium">Lot-wise EMD Table</p>
+                </div>
+                <p className="text-blue-700 text-sm">
+                  To view the lot-wise EMD table, please switch to <strong>"Lot-wise"</strong> evaluation methodology in the Preamble tab.
+                </p>
+                <p className="text-blue-600 text-xs mt-2">
+                  Current methodology: <strong>{data.evaluationMethodology || 'least cash outflow'}</strong>
+                </p>
+              </div>
             </div>
           ) : (
             /* Lot-wise - Show actual EMD calculations */
@@ -145,14 +159,16 @@ export function OtherSection({ data, onChange, calculatedValues }: OtherSectionP
 
                     {/* Table Rows */}
                     {data.lots.map((lot) => {
-                      console.log(`OtherSection EMD: Lot ${lot.lotNumber}, CEC=${lot.cecEstimateInclGst}, TenderType="${data.tenderType}"`);
                       // Ensure tender type is properly set - if undefined, show warning
                       const tenderType = data.tenderType || 'Goods';
                       if (!data.tenderType) {
                         console.warn('Tender type is undefined! Defaulting to Goods');
                       }
                       const lotEMD = calculateEMD(lot.cecEstimateInclGst || 0, tenderType);
-                      console.log(`OtherSection EMD Result: ${lotEMD}`);
+                      
+                      // Debug the CEC value display
+                      const cecDisplayValue = lot.cecEstimateInclGst || 0;
+                      
                       return (
                         <div key={lot.id} className="grid grid-cols-3 gap-2 p-3 border-t border-emerald-100 hover:bg-emerald-50/50 transition-colors duration-200">
                           {/* Lot Number */}
@@ -165,7 +181,7 @@ export function OtherSection({ data, onChange, calculatedValues }: OtherSectionP
                           {/* CEC Estimate */}
                           <div className="col-span-1">
                             <div className="text-sm text-emerald-700">
-                              ₹{Math.round((lot.cecEstimateInclGst || 0) * 10) / 10}Cr
+                              ₹{cecDisplayValue > 0 ? Math.round(cecDisplayValue * 10) / 10 : '0.0'}Cr
                             </div>
                           </div>
 
@@ -182,7 +198,12 @@ export function OtherSection({ data, onChange, calculatedValues }: OtherSectionP
                     {/* Summary Row */}
                     <div className="grid grid-cols-3 gap-2 p-3 bg-gradient-to-r from-emerald-100 to-green-100 border-t-2 border-emerald-300 font-bold text-emerald-900 text-sm">
                       <div className="col-span-1">TOTAL</div>
-                      <div className="col-span-1">₹{Math.round(data.lots.reduce((total, lot) => total + (lot.cecEstimateInclGst || 0), 0) * 10) / 10}Cr</div>
+                      <div className="col-span-1">
+                        {(() => {
+                          const totalCEC = data.lots.reduce((total, lot) => total + (lot.cecEstimateInclGst || 0), 0);
+                          return totalCEC > 0 ? `₹${Math.round(totalCEC * 10) / 10}Cr` : '₹0.0Cr';
+                        })()}
+                      </div>
                       <div className="col-span-1">
                         {(() => {
                           const totalEMD = data.lots.reduce((total, lot) => total + calculateEMD(lot.cecEstimateInclGst || 0, data.tenderType || 'Goods'), 0);

@@ -2,7 +2,6 @@ import type { BQCData, ManufacturerType } from '@/types';
 import { MANUFACTURER_TYPES, COMMERCIAL_EVALUATION_OPTIONS } from '@/utils/constants';
 import { formatCurrency, formatTurnoverAmount } from '@/utils/calculations';
 import { ExplanatoryNote } from '../ExplanatoryNote';
-import { useState } from 'react';
 
 interface BQCSectionProps {
   data: BQCData;
@@ -27,8 +26,9 @@ interface BQCSectionProps {
 }
 
 export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps) {
-  const [showMseCalculations, setShowMseCalculations] = useState(true);
-  const [showNonMseCalculations, setShowNonMseCalculations] = useState(true);
+  // Use persisted state from data object
+  const showMseCalculations = data.showMseCalculations ?? true;
+  const showNonMseCalculations = data.showNonMseCalculations ?? true;
   const handleManufacturerTypeChange = (type: string, checked: boolean) => {
     const currentTypes = data.manufacturerTypes || [];
     let newTypes;
@@ -490,7 +490,7 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
                       id="showNonMse"
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                       checked={showNonMseCalculations}
-                      onChange={(e) => setShowNonMseCalculations(e.target.checked)}
+                      onChange={(e) => onChange({ showNonMseCalculations: e.target.checked })}
                     />
                     <label htmlFor="showNonMse" className="ml-2 text-sm text-gray-700 font-medium">
                       Show Non-MSE (30%)
@@ -502,7 +502,7 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
                       id="showMse"
                       className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
                       checked={showMseCalculations}
-                      onChange={(e) => setShowMseCalculations(e.target.checked)}
+                      onChange={(e) => onChange({ showMseCalculations: e.target.checked })}
                     />
                     <label htmlFor="showMse" className="ml-2 text-sm text-gray-700 font-medium">
                       Show MSE (15%)
@@ -658,29 +658,31 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
         <div>
           <h4 className="text-md font-medium text-gray-900 mb-4">3.2 FINANCIAL CRITERIA</h4>
           
-          {/* Contract Duration for Calculation */}
-          <div className="mb-4">
-            <label htmlFor="contractDurationYears" className="form-label">
-              Contract Duration (Years) - For Calculation Only *
-            </label>
-            <input
-              type="number"
-              id="contractDurationYears"
-              className="form-input"
-              placeholder="1"
-              step="0.1"
-              min="0.1"
-              max="20"
-              value={data.contractDurationYears || ''}
-              onChange={(e) => onChange({ contractDurationYears: parseFloat(e.target.value) || 1 })}
-            />
-            <p className="text-sm text-gray-500 mt-1">
-              Enter contract duration in years (used for annualization calculations only, not shown in output)
-            </p>
-          </div>
+          {/* Contract Duration for Calculation - Only for least cash outflow (not needed for Lot-wise) */}
+          {data.evaluationMethodology !== 'Lot-wise' && (
+            <div className="mb-4">
+              <label htmlFor="contractDurationYears" className="form-label">
+                Contract Duration (Years) - For Calculation Only *
+              </label>
+              <input
+                type="number"
+                id="contractDurationYears"
+                className="form-input"
+                placeholder="1"
+                step="0.1"
+                min="0.1"
+                max="20"
+                value={data.contractDurationYears || ''}
+                onChange={(e) => onChange({ contractDurationYears: parseFloat(e.target.value) || 1 })}
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                Enter contract duration in years (used for annualization calculations only, not shown in output)
+              </p>
+            </div>
+          )}
           
           {/* Annual Turnover Section - Only for Lot-wise */}
-          {data.evaluationMethodology === 'Lot-wise' && (
+          {data.evaluationMethodology === 'Lot-wise' ? (
             <div className="mb-6 p-4 bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg">
               <h6 className="text-lg font-semibold text-green-900 mb-4">3.2.1 ANNUAL TURNOVER</h6>
               <p className="text-sm text-green-800 mb-4">
@@ -725,6 +727,7 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
                           }
                           
                           const contractYears = contractMonths / 12;
+                          // For annual turnover, we want the annualized value (divide by contract years if > 1 year)
                           const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
                           
                           // Convert to Lakhs for display (1 Crore = 100 Lakhs)
@@ -742,10 +745,10 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
                                 {lot.lotNumber || `Lot ${index + 1}`}
                               </td>
                               <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                                {Math.round(annualizedValueInLakhs * 100) / 100}
+                                {annualizedValueInLakhs > 0 ? Math.round(annualizedValueInLakhs * 100) / 100 : '0.00'}
                               </td>
                               <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                                {Math.round(turnoverRequirement * 100) / 100}
+                                {turnoverRequirement > 0 ? Math.round(turnoverRequirement * 100) / 100 : '0.00'}
                               </td>
                             </tr>
                           );
@@ -760,41 +763,48 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
                             TOTAL FOR ALL LOTS
                           </td>
                           <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                            {Math.round(data.lots.reduce((total, lot) => {
-                              const baseAmount = lot.cecEstimateInclGst || 0;
-                              let contractMonths = lot.contractPeriodMonths || 12;
-                              if (lot.contractPeriodText) {
-                                const textMatch = lot.contractPeriodText.match(/(\d+)/);
-                                if (textMatch) {
-                                  contractMonths = parseInt(textMatch[1]);
-                                  if (lot.contractPeriodText.toLowerCase().includes('year')) {
-                                    contractMonths = contractMonths * 12;
+                            {(() => {
+                              const totalAnnualizedValue = data.lots.reduce((total, lot) => {
+                                const baseAmount = lot.cecEstimateInclGst || 0;
+                                let contractMonths = lot.contractPeriodMonths || 12;
+                                if (lot.contractPeriodText) {
+                                  const textMatch = lot.contractPeriodText.match(/(\d+)/);
+                                  if (textMatch) {
+                                    contractMonths = parseInt(textMatch[1]);
+                                    if (lot.contractPeriodText.toLowerCase().includes('year')) {
+                                      contractMonths = contractMonths * 12;
+                                    }
                                   }
                                 }
-                              }
-                              const contractYears = contractMonths / 12;
-                              const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
-                              return total + (annualizedAmount * 100);
-                            }, 0) * 100) / 100}
+                                const contractYears = contractMonths / 12;
+                                const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+                                return total + (annualizedAmount * 100); // Convert to Lakhs
+                              }, 0);
+                              return totalAnnualizedValue > 0 ? Math.round(totalAnnualizedValue * 100) / 100 : '0.00';
+                            })()}
                           </td>
                           <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                            {Math.round(data.lots.reduce((total, lot) => {
-                              const baseAmount = lot.cecEstimateInclGst || 0;
-                              let contractMonths = lot.contractPeriodMonths || 12;
-                              if (lot.contractPeriodText) {
-                                const textMatch = lot.contractPeriodText.match(/(\d+)/);
-                                if (textMatch) {
-                                  contractMonths = parseInt(textMatch[1]);
-                                  if (lot.contractPeriodText.toLowerCase().includes('year')) {
-                                    contractMonths = contractMonths * 12;
+                            {(() => {
+                              const totalTurnoverRequirement = data.lots.reduce((total, lot) => {
+                                const baseAmount = lot.cecEstimateInclGst || 0;
+                                let contractMonths = lot.contractPeriodMonths || 12;
+                                if (lot.contractPeriodText) {
+                                  const textMatch = lot.contractPeriodText.match(/(\d+)/);
+                                  if (textMatch) {
+                                    contractMonths = parseInt(textMatch[1]);
+                                    if (lot.contractPeriodText.toLowerCase().includes('year')) {
+                                      contractMonths = contractMonths * 12;
+                                    }
                                   }
                                 }
-                              }
-                              const contractYears = contractMonths / 12;
-                              const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
-                              const turnoverRequirement = (annualizedAmount * 100) * 0.3;
-                              return total + turnoverRequirement;
-                            }, 0) * 100) / 100}
+                                const contractYears = contractMonths / 12;
+                                const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+                                const annualizedValueInLakhs = annualizedAmount * 100;
+                                const turnoverRequirement = annualizedValueInLakhs * 0.3;
+                                return total + turnoverRequirement;
+                              }, 0);
+                              return totalTurnoverRequirement > 0 ? Math.round(totalTurnoverRequirement * 100) / 100 : '0.00';
+                            })()}
                           </td>
                         </tr>
                       </tbody>
@@ -812,6 +822,22 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
               <div className="mt-4 p-3 bg-green-100 rounded-lg">
                 <p className="text-sm text-green-800 font-medium">
                   <strong>Note:</strong> Bidder can quote for any one or more than one LOT based on their capability/choice. If the Bidder quotes for more than one LOT, the average value of Turnover should not be less than the cumulative amount applicable for the LOTs quoted.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="mb-6 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+              <h6 className="text-lg font-semibold text-blue-900 mb-4">3.2.1 ANNUAL TURNOVER</h6>
+              <div className="bg-blue-100 border border-blue-300 rounded-lg p-4">
+                <div className="flex items-center space-x-2 mb-2">
+                  <div className="text-blue-600">ℹ️</div>
+                  <p className="text-blue-800 font-medium">Lot-wise Annual Turnover Table</p>
+                </div>
+                <p className="text-blue-700 text-sm">
+                  To view the lot-wise annual turnover table, please switch to <strong>"Lot-wise"</strong> evaluation methodology in the Preamble tab.
+                </p>
+                <p className="text-blue-600 text-xs mt-2">
+                  Current methodology: <strong>{data.evaluationMethodology || 'least cash outflow'}</strong>
                 </p>
               </div>
             </div>
