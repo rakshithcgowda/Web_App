@@ -155,39 +155,6 @@ export function ScopeSection({ data, onChange, calculatedValues }: ScopeSectionP
                   placeholder="Enter explanatory note for Past Performance Requirement..."
                 />
               </div>
-        ) : data.tenderType === 'Goods' ? (
-          /* Lot-wise - Individual Calculations Notice */
-          <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-6">
-            <div className="flex items-center space-x-2 mb-4">
-              <svg className="h-5 w-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              <h4 className="text-md font-semibold text-purple-900">Lot-wise Calculations</h4>
-            </div>
-            
-            <div className="space-y-3">
-               <p className="text-sm text-purple-800 font-medium">
-                 Individual calculations shown in lot table above
-               </p>
-              
-              {data.lots && data.lots.length > 0 && (
-                <div className="mt-4 p-3 bg-white/60 rounded-lg border border-purple-100">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-purple-600 font-medium">Total Lots:</span>
-                      <p className="text-purple-900 font-semibold">{data.lots.length}</p>
-                    </div>
-                    <div>
-                      <span className="text-purple-600 font-medium">Lots with AMC:</span>
-                      <p className="text-purple-900 font-semibold">
-                        {data.lots.filter(lot => lot.hasAmc).length}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
         ) : null}
 
         {/* AMC Section - Only show for least cash outflow */}

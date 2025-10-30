@@ -124,18 +124,6 @@ export function OtherSection({ data, onChange, calculatedValues }: OtherSectionP
                   EMD: {calculatedValues.emdAmount === 0 ? 'Nil' : formatCurrency(calculatedValues.emdAmount, 'Lacs')}
                 </p>
               </div>
-              <div className="bg-blue-100 border border-blue-300 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-2">
-                  <div className="text-blue-600">ℹ️</div>
-                  <p className="text-blue-800 font-medium">Lot-wise EMD Table</p>
-                </div>
-                <p className="text-blue-700 text-sm">
-                  To view the lot-wise EMD table, please switch to <strong>"Lot-wise"</strong> evaluation methodology in the Preamble tab.
-                </p>
-                <p className="text-blue-600 text-xs mt-2">
-                  Current methodology: <strong>{data.evaluationMethodology || 'least cash outflow'}</strong>
-                </p>
-              </div>
             </div>
           ) : (
             /* Lot-wise - Show actual EMD calculations */

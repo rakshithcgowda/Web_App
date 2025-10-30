@@ -440,14 +440,9 @@ router.post('/generate', async (req: AuthRequest, res) => {
       return `₹ ${formattedAmount}`;
     };
 
-    // Format past performance amount for display
-    const formatPastPerformance = (amountInCrores: number): string => {
-      if (amountInCrores >= 1) {
-        return `${amountInCrores} Crore${amountInCrores > 1 ? 's' : ''}`;
-      } else {
-        const amountInLakhs = amountInCrores * 100;
-        return `${amountInLakhs} Lakh${amountInLakhs > 1 ? 's' : ''}`;
-      }
+    // Format past performance amount as units (for Goods with least cash outflow)
+    const formatPastPerformanceUnits = (units: number): string => {
+      return `${units.toLocaleString()} unit${units !== 1 ? 's' : ''}`;
     };
 
     // Format date to dd/mm/yyyy format
@@ -1496,7 +1491,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
               new Paragraph({
                 children: [
                   new TextRun({ 
-                    text: `The bidder shall have experience of having successfully supplied minimum of ${formatPastPerformance(pastPerformanceNonMSE)} in any 12 continuous months during last 7 years in India or abroad, ending on last day of the month previous to the one in which tender is invited.`, 
+                    text: `The bidder shall have experience of having successfully supplied minimum of ${formatPastPerformanceUnits(pastPerformanceNonMSE)} in any 12 continuous months during last 7 years in India or abroad, ending on last day of the month previous to the one in which tender is invited.`, 
                     size: 24,
                     font: "Arial"
                   }),
@@ -1521,7 +1516,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                 new Paragraph({
                   children: [
                     new TextRun({ 
-                      text: `The MSE bidder shall have experience of having successfully supplied minimum of ${formatPastPerformance(pastPerformanceMSE)} in any 12 continuous months during last 7 years in India or abroad, ending on last day of the month previous to the one in which tender is invited.`, 
+                      text: `The MSE bidder shall have experience of having successfully supplied minimum of ${formatPastPerformanceUnits(pastPerformanceMSE)} in any 12 continuous months during last 7 years in India or abroad, ending on last day of the month previous to the one in which tender is invited.`, 
                       size: 24,
                       font: "Arial"
                     }),

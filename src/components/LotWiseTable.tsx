@@ -199,16 +199,17 @@ export function LotWiseTable({
           </div>
         </div>
         
-        <div className="flex items-center gap-3">
-          <button
-            onClick={addNewLot}
-            className="btn-primary flex items-center space-x-2 text-sm"
-          >
-            <PlusIcon className="h-4 w-4" />
-            <span>Add Lot</span>
-          </button>
-          
-        </div>
+        {evaluationMethodology === 'Lot-wise' && (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={addNewLot}
+              className="btn-primary flex items-center space-x-2 text-sm"
+            >
+              <PlusIcon className="h-4 w-4" />
+              <span>Add Lot</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Global CEC Fields for least cash outflow */}

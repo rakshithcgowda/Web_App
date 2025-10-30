@@ -825,23 +825,7 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
                 </p>
               </div>
             </div>
-          ) : (
-            <div className="mb-6 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
-              <h6 className="text-lg font-semibold text-blue-900 mb-4">3.2.1 ANNUAL TURNOVER</h6>
-              <div className="bg-blue-100 border border-blue-300 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-2">
-                  <div className="text-blue-600">ℹ️</div>
-                  <p className="text-blue-800 font-medium">Lot-wise Annual Turnover Table</p>
-                </div>
-                <p className="text-blue-700 text-sm">
-                  To view the lot-wise annual turnover table, please switch to <strong>"Lot-wise"</strong> evaluation methodology in the Preamble tab.
-                </p>
-                <p className="text-blue-600 text-xs mt-2">
-                  Current methodology: <strong>{data.evaluationMethodology || 'least cash outflow'}</strong>
-                </p>
-              </div>
-            </div>
-          )}
+          ) : null}
           
           {data.evaluationMethodology === 'least cash outflow' && (
             /* least cash outflow - Show calculated turnover with separate MSE sections */
