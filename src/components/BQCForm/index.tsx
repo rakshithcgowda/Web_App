@@ -103,6 +103,20 @@ export function BQCForm() {
     setCompletedSections(newCompletedSections);
   }, [bqcData]);
 
+  useEffect(() => {
+    if (
+      bqcData.evaluationMethodology === 'least cash outflow' &&
+      bqcData.lots &&
+      bqcData.lots.length > 0
+    ) {
+      const incl = bqcData.lots.reduce((sum, lot) => sum + (lot.cecEstimateInclGst || 0), 0);
+      const excl = bqcData.lots.reduce((sum, lot) => sum + (lot.cecEstimateExclGst || 0), 0);
+      if (bqcData.cecEstimateInclGst !== incl || bqcData.cecEstimateExclGst !== excl) {
+        updateBQCData({ cecEstimateInclGst: incl, cecEstimateExclGst: excl });
+      }
+    }
+  }, [bqcData.lots, bqcData.evaluationMethodology]);
+
   const handleSave = async () => {
     const result = await saveBQCData();
     if (result.success) {

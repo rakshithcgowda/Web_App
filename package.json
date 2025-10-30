@@ -12,7 +12,7 @@
     "dev:server": "nodemon --exec tsx server/index.ts",
     "build": "tsc -b && vite build",
     "build:server": "tsc server/index.ts --outDir dist-server --target ES2020 --module commonjs --esModuleInterop --allowSyntheticDefaultImports --strict",
-    "start": "node dist-server/index.js",
+    "start": "tsx server/index.ts",
     "start:server": "tsx server/index.ts",
     "lint": "eslint .",
     "preview": "vite preview",

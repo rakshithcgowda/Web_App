@@ -41,13 +41,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const deleted = await database.deleteBQCData(id, userId);
-    if (!deleted) {
+    // Check if BQC data exists before attempting to delete
+    const bqcData = await database.getBQCData(userId, id);
+    if (!bqcData) {
       return res.status(404).json({
         success: false,
         message: 'BQC data not found'
       });
     }
+
+    // Delete the BQC data
+    await database.deleteBQCData(userId, id);
 
     res.json({
       success: true,
