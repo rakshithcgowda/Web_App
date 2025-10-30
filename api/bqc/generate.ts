@@ -256,13 +256,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
         console.log('=== END BACKEND DEBUG ===');
         
+        // Use frontend pre-calculated values if they exist and are valid, otherwise use backend calculated values
+        const finalOptionA = (lot.similarWorksOptionA !== undefined && !isNaN(lot.similarWorksOptionA) && lot.similarWorksOptionA > 0) 
+          ? lot.similarWorksOptionA 
+          : optionA;
+        const finalOptionB = (lot.similarWorksOptionB !== undefined && !isNaN(lot.similarWorksOptionB) && lot.similarWorksOptionB > 0) 
+          ? lot.similarWorksOptionB 
+          : optionB;
+        const finalOptionC = (lot.similarWorksOptionC !== undefined && !isNaN(lot.similarWorksOptionC) && lot.similarWorksOptionC > 0) 
+          ? lot.similarWorksOptionC 
+          : optionC;
+        
+        console.log(`🔍 Value Selection for Lot ${index + 1}:`, {
+          frontendOptionA: lot.similarWorksOptionA,
+          frontendOptionB: lot.similarWorksOptionB,
+          frontendOptionC: lot.similarWorksOptionC,
+          backendOptionA: optionA,
+          backendOptionB: optionB,
+          backendOptionC: optionC,
+          finalOptionA,
+          finalOptionB,
+          finalOptionC
+        });
+        
         return {
           ...lot,
+          // Preserve original CEC values - CRITICAL!
+          cecEstimateInclGst: cecInclGst, // Ensure this is preserved
+          cecEstimateExclGst: cecExclGst,
           annualizedValue: annualizedAmount, // Keep in Crores for internal calculations
           annualizedValueInLakhs: annualizedValueInLakhs, // Store in Lakhs for display (matches UI)
-          optionA,
-          optionB,
-          optionC,
+          optionA: finalOptionA, // Use final calculated value
+          optionB: finalOptionB,
+          optionC: finalOptionC,
+          // Also preserve frontend values for reference
+          similarWorksOptionA: lot.similarWorksOptionA || finalOptionA,
+          similarWorksOptionB: lot.similarWorksOptionB || finalOptionB,
+          similarWorksOptionC: lot.similarWorksOptionC || finalOptionC,
           turnover,
           contractMonths,
           contractYears
@@ -375,25 +405,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Process lots with calculated values
     const processedLots = calculateLotValues(bqcData.lots || []);
     
-    // Debug logging
-    console.log('Document Generation Debug Info:');
+    // Debug logging - CRITICAL: Verify calculated values exist
+    console.log('=== PROCESSED LOTS DEBUG ===');
     console.log('- Total lots:', processedLots.length);
     console.log('- Contract Duration Years:', bqcData.contractDurationYears);
-    console.log('- Lots data:', processedLots.map(lot => ({
-      lotNumber: lot.lotNumber,
-      cecInclGst: lot.cecEstimateInclGst,
-      cecExclGst: lot.cecEstimateExclGst,
-      contractPeriodText: lot.contractPeriodText,
-      contractMonths: lot.contractPeriodMonths,
-      annualizedValue: lot.annualizedValue,
-      optionA: lot.optionA,
-      optionB: lot.optionB,
-      optionC: lot.optionC,
-      turnover: lot.turnover,
-      hasAmc: lot.hasAmc,
-      amcValue: lot.amcValue,
-      mseRelaxation: lot.mseRelaxation
-    })));
+    processedLots.forEach((lot, index) => {
+      console.log(`\nProcessed Lot ${index + 1} (${lot.lotNumber}):`);
+      console.log('  - CEC Incl GST:', lot.cecEstimateInclGst, `(type: ${typeof lot.cecEstimateInclGst})`);
+      console.log('  - optionA:', lot.optionA, `(exists: ${lot.optionA !== undefined}, isNumber: ${typeof lot.optionA === 'number'})`);
+      console.log('  - optionB:', lot.optionB, `(exists: ${lot.optionB !== undefined}, isNumber: ${typeof lot.optionB === 'number'})`);
+      console.log('  - optionC:', lot.optionC, `(exists: ${lot.optionC !== undefined}, isNumber: ${typeof lot.optionC === 'number'})`);
+      console.log('  - annualizedValueInLakhs:', lot.annualizedValueInLakhs);
+      console.log('  - turnover:', lot.turnover);
+      
+      if (lot.optionA === undefined || lot.optionB === undefined || lot.optionC === undefined) {
+        console.error(`  ❌ WARNING: Lot ${index + 1} is missing pre-calculated values!`);
+      } else if (lot.optionA === 0 && lot.optionB === 0 && lot.optionC === 0) {
+        console.error(`  ❌ WARNING: Lot ${index + 1} has all zero values - this will show 0.00 in document!`);
+      } else {
+        console.log(`  ✅ Lot ${index + 1} has valid calculated values`);
+      }
+    });
+    console.log('=== END PROCESSED LOTS DEBUG ===\n');
     
     // Check if we have valid lot data
     if (!processedLots || processedLots.length === 0) {
@@ -1125,51 +1158,72 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   ]),
                 ],
               }),
-              // Data rows for each lot
+              // Data rows for each lot - Use pre-calculated values from calculateLotValues
               ...processedLots.map((lot, index) => {
-                // Recalculate on-the-fly to ensure values are correct
-                const baseAmount = typeof lot.cecEstimateInclGst === 'string' 
-                  ? parseFloat(lot.cecEstimateInclGst) || 0 
-                  : (lot.cecEstimateInclGst || 0);
+                // FIRST: Check if we have pre-calculated values from calculateLotValues
+                let optionA = (lot.optionA !== undefined && !isNaN(lot.optionA)) ? lot.optionA : undefined;
+                let optionB = (lot.optionB !== undefined && !isNaN(lot.optionB)) ? lot.optionB : undefined;
+                let optionC = (lot.optionC !== undefined && !isNaN(lot.optionC)) ? lot.optionC : undefined;
                 
-                // Parse contract period
-                let contractMonths = lot.contractPeriodMonths || 12;
-                if (lot.contractPeriodText) {
-                  const textMatch = lot.contractPeriodText.match(/(\d+)/);
-                  if (textMatch) {
-                    contractMonths = parseInt(textMatch[1]);
-                    if (lot.contractPeriodText.toLowerCase().includes('year')) {
-                      contractMonths = contractMonths * 12;
+                // ONLY recalculate if pre-calculated values don't exist
+                if (optionA === undefined || optionB === undefined || optionC === undefined) {
+                  const baseAmount = typeof lot.cecEstimateInclGst === 'string' 
+                    ? parseFloat(lot.cecEstimateInclGst) || 0 
+                    : (lot.cecEstimateInclGst || 0);
+                  
+                  // Parse contract period
+                  let contractMonths = lot.contractPeriodMonths || 12;
+                  if (lot.contractPeriodText) {
+                    const textMatch = lot.contractPeriodText.match(/(\d+)/);
+                    if (textMatch) {
+                      contractMonths = parseInt(textMatch[1]);
+                      if (lot.contractPeriodText.toLowerCase().includes('year')) {
+                        contractMonths = contractMonths * 12;
+                      }
                     }
                   }
+                  
+                  const contractYears = contractMonths / 12;
+                  const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+                  const finalAmount = lot.mseRelaxation ? annualizedAmount * 0.85 : annualizedAmount;
+                  const amountInLakhs = finalAmount * 100;
+                  
+                  optionA = optionA !== undefined ? optionA : (amountInLakhs * 0.8);
+                  optionB = optionB !== undefined ? optionB : (amountInLakhs * 0.5);
+                  optionC = optionC !== undefined ? optionC : (amountInLakhs * 0.4);
                 }
-                
-                const contractYears = contractMonths / 12;
-                const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
-                const finalAmount = lot.mseRelaxation ? annualizedAmount * 0.85 : annualizedAmount;
-                const amountInLakhs = finalAmount * 100;
-                
-                const optionA = amountInLakhs * 0.8;
-                const optionB = amountInLakhs * 0.5;
-                const optionC = amountInLakhs * 0.4;
                 
                 // Calculate MSE values (15% reduction)
                 const mseOptionA = optionA * 0.85;
                 const mseOptionB = optionB * 0.85;
                 const mseOptionC = optionC * 0.85;
                 
-                console.log(`🔍 Technical Criteria Table - Lot ${index + 1}:`, {
+                // Ensure values are valid numbers before rendering
+                const safeOptionA = (typeof optionA === 'number' && !isNaN(optionA) && optionA >= 0) ? optionA : 0;
+                const safeOptionB = (typeof optionB === 'number' && !isNaN(optionB) && optionB >= 0) ? optionB : 0;
+                const safeOptionC = (typeof optionC === 'number' && !isNaN(optionC) && optionC >= 0) ? optionC : 0;
+                
+                console.log(`🔍 Technical Criteria Table - Lot ${index + 1} - FINAL RENDER VALUES:`, {
                   lotNumber: lot.lotNumber,
                   cecEstimateInclGst: lot.cecEstimateInclGst,
-                  baseAmount,
-                  amountInLakhs,
-                  optionA,
-                  optionB,
-                  optionC,
-                  formattedA: (Math.round(optionA * 100) / 100).toFixed(2),
-                  formattedB: (Math.round(optionB * 100) / 100).toFixed(2),
-                  formattedC: (Math.round(optionC * 100) / 100).toFixed(2)
+                  preCalculatedOptionA: lot.optionA,
+                  preCalculatedOptionB: lot.optionB,
+                  preCalculatedOptionC: lot.optionC,
+                  'optionA_raw': optionA,
+                  'optionB_raw': optionB,
+                  'optionC_raw': optionC,
+                  'optionA_safe': safeOptionA,
+                  'optionB_safe': safeOptionB,
+                  'optionC_safe': safeOptionC,
+                  'willRender_A': (Math.round(safeOptionA * 100) / 100).toFixed(2),
+                  'willRender_B': (Math.round(safeOptionB * 100) / 100).toFixed(2),
+                  'willRender_C': (Math.round(safeOptionC * 100) / 100).toFixed(2)
                 });
+                
+                // Use safe values for all subsequent operations
+                optionA = safeOptionA;
+                optionB = safeOptionB;
+                optionC = safeOptionC;
                 
                 return new TableRow({
                   children: [
@@ -1187,19 +1241,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     }),
                     new TableCell({
                       children: [new Paragraph({
-                        children: [new TextRun({ text: `${(Math.round(optionA * 100) / 100).toFixed(2)}`, size: 20, font: "Arial" })],
+                        children: [new TextRun({ 
+                          text: `${((typeof optionA === 'number' && !isNaN(optionA) && optionA >= 0) ? (Math.round(optionA * 100) / 100).toFixed(2) : '0.00')}`, 
+                          size: 20, 
+                          font: "Arial" 
+                        })],
                         alignment: AlignmentType.CENTER,
                       })],
                     }),
                     new TableCell({
                       children: [new Paragraph({
-                        children: [new TextRun({ text: `${(Math.round(optionB * 100) / 100).toFixed(2)}`, size: 20, font: "Arial" })],
+                        children: [new TextRun({ 
+                          text: `${((typeof optionB === 'number' && !isNaN(optionB) && optionB >= 0) ? (Math.round(optionB * 100) / 100).toFixed(2) : '0.00')}`, 
+                          size: 20, 
+                          font: "Arial" 
+                        })],
                         alignment: AlignmentType.CENTER,
                       })],
                     }),
                     new TableCell({
                       children: [new Paragraph({
-                        children: [new TextRun({ text: `${(Math.round(optionC * 100) / 100).toFixed(2)}`, size: 20, font: "Arial" })],
+                        children: [new TextRun({ 
+                          text: `${((typeof optionC === 'number' && !isNaN(optionC) && optionC >= 0) ? (Math.round(optionC * 100) / 100).toFixed(2) : '0.00')}`, 
+                          size: 20, 
+                          font: "Arial" 
+                        })],
                         alignment: AlignmentType.CENTER,
                       })],
                     }),
@@ -1361,30 +1427,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               }),
               // Data rows for each lot - Use EXACT same values as displayed in UI
               ...processedLots.map((lot, index) => {
-                // Recalculate using EXACT same logic as UI (BQCSection.tsx lines 711-735)
-                const baseAmount = typeof lot.cecEstimateInclGst === 'string' 
-                  ? parseFloat(lot.cecEstimateInclGst) || 0 
-                  : (lot.cecEstimateInclGst || 0);
+                // Use pre-calculated values from processedLots if available, otherwise recalculate
+                let annualizedValueInLakhs = lot.annualizedValueInLakhs || 0;
+                let turnoverRequirement = lot.turnover || 0;
                 
-                // Parse contract period - EXACT same as UI
-                let contractMonths = lot.contractPeriodMonths || 12;
-                if (lot.contractPeriodText) {
-                  const textMatch = lot.contractPeriodText.match(/(\d+)/);
-                  if (textMatch) {
-                    contractMonths = parseInt(textMatch[1]);
-                    if (lot.contractPeriodText.toLowerCase().includes('year')) {
-                      contractMonths = contractMonths * 12;
+                // If pre-calculated values don't exist, recalculate using EXACT same logic as UI
+                if ((!lot.annualizedValueInLakhs && !lot.turnover) || (annualizedValueInLakhs === 0 && turnoverRequirement === 0)) {
+                  const baseAmount = typeof lot.cecEstimateInclGst === 'string'
+                    ? parseFloat(lot.cecEstimateInclGst) || 0 
+                    : (lot.cecEstimateInclGst || 0);
+                  
+                  // Parse contract period - EXACT same as UI
+                  let contractMonths = lot.contractPeriodMonths || 12;
+                  if (lot.contractPeriodText) {
+                    const textMatch = lot.contractPeriodText.match(/(\d+)/);
+                    if (textMatch) {
+                      contractMonths = parseInt(textMatch[1]);
+                      if (lot.contractPeriodText.toLowerCase().includes('year')) {
+                        contractMonths = contractMonths * 12;
+                      }
                     }
                   }
+                  
+                  const contractYears = contractMonths / 12;
+                  // EXACT same calculation as UI line 729
+                  const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
+                  // EXACT same conversion as UI line 732
+                  annualizedValueInLakhs = annualizedAmount * 100;
+                  // EXACT same calculation as UI line 735
+                  turnoverRequirement = annualizedValueInLakhs * 0.3;
                 }
-                
-                const contractYears = contractMonths / 12;
-                // EXACT same calculation as UI line 729
-                const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
-                // EXACT same conversion as UI line 732
-                const annualizedValueInLakhs = annualizedAmount * 100;
-                // EXACT same calculation as UI line 735
-                const turnoverRequirement = annualizedValueInLakhs * 0.3;
                 
                 // EXACT same formatting as UI lines 746 and 749
                 const formattedAnnualized = annualizedValueInLakhs > 0 ? Math.round(annualizedValueInLakhs * 100) / 100 : 0;
@@ -1392,7 +1464,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 
                 console.log(`Financial Criteria Table - Lot ${index + 1}:`, {
                   lotNumber: lot.lotNumber,
-                  cecEstimateInclGst: baseAmount,
+                  cecEstimateInclGst: lot.cecEstimateInclGst,
+                  preCalculatedAnnualized: lot.annualizedValueInLakhs,
+                  preCalculatedTurnover: lot.turnover,
                   annualizedValueInLakhs,
                   turnoverRequirement,
                   formattedAnnualized,

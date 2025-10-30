@@ -1637,9 +1637,20 @@ router.post('/generate', async (req: AuthRequest, res) => {
                   }),
                   // Data rows
                   ...bqcData.lots.map((lot: LotData, index: number) => {
-                    const quantityRequired = lot.quantitySupplied || 0;
+                    // Parse quantitySupplied - handle both string and number types
+                    const quantityRequired = typeof lot.quantitySupplied === 'string' 
+                      ? parseFloat(lot.quantitySupplied) || 0 
+                      : (lot.quantitySupplied || 0);
                     const nonMseRequirement = Math.round(quantityRequired * 0.3);
                     const mseRequirement = Math.round(quantityRequired * 0.15); // 15% for MSE
+                    
+                    console.log(`  Supplying Capacity Table - Lot ${index + 1} (${lot.lotNumber}):`, {
+                      quantitySupplied: lot.quantitySupplied,
+                      quantitySuppliedType: typeof lot.quantitySupplied,
+                      quantityRequired,
+                      nonMseRequirement,
+                      mseRequirement
+                    });
                     
                     return new TableRow({
                       children: [
@@ -1678,9 +1689,20 @@ router.post('/generate', async (req: AuthRequest, res) => {
                   }),
                   // Total row
                   (() => {
-                    const totalQuantity = bqcData.lots.reduce((sum: number, lot: LotData) => sum + (lot.quantitySupplied || 0), 0);
+                    const totalQuantity = bqcData.lots.reduce((sum: number, lot: LotData) => {
+                      const qty = typeof lot.quantitySupplied === 'string' 
+                        ? parseFloat(lot.quantitySupplied) || 0 
+                        : (lot.quantitySupplied || 0);
+                      return sum + qty;
+                    }, 0);
                     const totalNonMse = Math.round(totalQuantity * 0.3);
                     const totalMse = Math.round(totalQuantity * 0.15);
+                    
+                    console.log(`  Supplying Capacity Table - TOTAL:`, {
+                      totalQuantity,
+                      totalNonMse,
+                      totalMse
+                    });
                     
                     return new TableRow({
                       children: [
@@ -1741,8 +1763,8 @@ router.post('/generate', async (req: AuthRequest, res) => {
             }),
           ] : []),
           
-          // Service/Works content
-          ...((bqcData.tenderType === 'Service' || bqcData.tenderType === 'Works') ? [
+          // Service/Works content - Exclude Lot-wise as it has its own section
+          ...((bqcData.tenderType === 'Service' || bqcData.tenderType === 'Works') && bqcData.evaluationMethodology !== 'Lot-wise' ? [
                       new Paragraph({
                         children: [
                           new TextRun({ 
@@ -2160,12 +2182,17 @@ router.post('/generate', async (req: AuthRequest, res) => {
                   console.log(`  contractYears:`, contractYears);
                   console.log(`  annualizedAmount:`, annualizedAmount);
                   
-                  // Standard values (no MSE reduction)
-                  const optionA = annualizedAmount * 0.8; // 80% - One work
-                  const optionB = annualizedAmount * 0.5; // 50% - Two works each
-                  const optionC = annualizedAmount * 0.4; // 40% - Three works each
+                  // Convert to Lakhs for display (1 Crore = 100 Lakhs)
+                  // annualizedAmount is in Crores, so multiply by 100 to get Lakhs
+                  const annualizedAmountInLakhs = annualizedAmount * 100;
                   
-                  console.log(`  Final values - optionA: ${optionA}, optionB: ${optionB}, optionC: ${optionC}`);
+                  // Standard values (no MSE reduction) - Calculate in Lakhs
+                  const optionA = annualizedAmountInLakhs * 0.8; // 80% - One work
+                  const optionB = annualizedAmountInLakhs * 0.5; // 50% - Two works each
+                  const optionC = annualizedAmountInLakhs * 0.4; // 40% - Three works each
+                  
+                  console.log(`  Final values - optionA: ${optionA} Lakhs, optionB: ${optionB} Lakhs, optionC: ${optionC} Lakhs`);
+                  console.log(`  RENDERING AS: optionA=${optionA.toFixed(2)}, optionB=${optionB.toFixed(2)}, optionC=${optionC.toFixed(2)}`);
                   
                   return new TableRow({
                     children: [
@@ -2204,7 +2231,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                           new Paragraph({
                             children: [
                               new TextRun({ 
-                                text: `${(optionA / 100000).toFixed(2)}`, 
+                                text: `${(Math.round(optionA * 100) / 100).toFixed(2)}`, 
                                 size: 20,
                                 font: "Arial"
                               }),
@@ -2219,7 +2246,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                           new Paragraph({
                             children: [
                               new TextRun({ 
-                                text: `${(optionB / 100000).toFixed(2)}`, 
+                                text: `${(Math.round(optionB * 100) / 100).toFixed(2)}`, 
                                 size: 20,
                                 font: "Arial"
                               }),
@@ -2234,7 +2261,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                           new Paragraph({
                             children: [
                               new TextRun({ 
-                                text: `${(optionC / 100000).toFixed(2)}`, 
+                                text: `${(Math.round(optionC * 100) / 100).toFixed(2)}`, 
                                 size: 20,
                                 font: "Arial"
                               }),
@@ -2388,11 +2415,16 @@ router.post('/generate', async (req: AuthRequest, res) => {
                     const contractYears = contractMonths / 12;
                     const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
                     
-                    // MSE values (with 15% reduction)
-                    const mseAnnualizedAmount = annualizedAmount * 0.85;
-                    const mseOptionA = mseAnnualizedAmount * 0.8;
-                    const mseOptionB = mseAnnualizedAmount * 0.5;
-                    const mseOptionC = mseAnnualizedAmount * 0.4;
+                    // Convert to Lakhs for display (1 Crore = 100 Lakhs)
+                    const annualizedAmountInLakhs = annualizedAmount * 100;
+                    
+                    // MSE values (with 15% reduction) - Apply reduction to Lakhs
+                    const mseAnnualizedAmountInLakhs = annualizedAmountInLakhs * 0.85;
+                    const mseOptionA = mseAnnualizedAmountInLakhs * 0.8; // 80% - One work
+                    const mseOptionB = mseAnnualizedAmountInLakhs * 0.5; // 50% - Two works each
+                    const mseOptionC = mseAnnualizedAmountInLakhs * 0.4; // 40% - Three works each
+                    
+                    console.log(`  MSE Table - Lot ${index + 1}: annualizedAmountInLakhs=${annualizedAmountInLakhs}, mseAnnualizedAmountInLakhs=${mseAnnualizedAmountInLakhs}, mseOptionA=${mseOptionA}, mseOptionB=${mseOptionB}, mseOptionC=${mseOptionC}`);
                     
                     return new TableRow({
                       children: [
@@ -2431,7 +2463,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                             new Paragraph({
                               children: [
                                 new TextRun({ 
-                                  text: `${(mseOptionA / 100000).toFixed(2)}`, 
+                                  text: `${(Math.round(mseOptionA * 100) / 100).toFixed(2)}`, 
                                   size: 20,
                                   font: "Arial"
                                 }),
@@ -2446,7 +2478,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                             new Paragraph({
                               children: [
                                 new TextRun({ 
-                                  text: `${(mseOptionB / 100000).toFixed(2)}`, 
+                                  text: `${(Math.round(mseOptionB * 100) / 100).toFixed(2)}`, 
                                   size: 20,
                                   font: "Arial"
                                 }),
@@ -2461,7 +2493,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                             new Paragraph({
                               children: [
                                 new TextRun({ 
-                                  text: `${(mseOptionC / 100000).toFixed(2)}`, 
+                                  text: `${(Math.round(mseOptionC * 100) / 100).toFixed(2)}`, 
                                   size: 20,
                                   font: "Arial"
                                 }),
@@ -2658,7 +2690,12 @@ router.post('/generate', async (req: AuthRequest, res) => {
                   
                   const contractYears = contractMonths / 12;
                   const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
-                  const turnoverRequirement = annualizedAmount * 0.3; // 30% of annualized amount
+                  
+                  // Convert to Lakhs for display (1 Crore = 100 Lakhs)
+                  const annualizedAmountInLakhs = annualizedAmount * 100;
+                  const turnoverRequirement = annualizedAmountInLakhs * 0.3; // 30% of annualized amount in Lakhs
+                  
+                  console.log(`  Annual Turnover Table - Lot ${index + 1}: annualizedAmount=${annualizedAmount} Cr, annualizedAmountInLakhs=${annualizedAmountInLakhs}, turnoverRequirement=${turnoverRequirement}`);
                   
                   return new TableRow({
                     children: [
@@ -2697,7 +2734,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                           new Paragraph({
                             children: [
                               new TextRun({ 
-                                text: `${(annualizedAmount / 100000).toFixed(2)}`, 
+                                text: `${(Math.round(annualizedAmountInLakhs * 100) / 100).toFixed(2)}`, 
                                 size: 20,
                                 font: "Arial"
                               }),
@@ -2712,7 +2749,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                           new Paragraph({
                             children: [
                               new TextRun({ 
-                                text: `${(turnoverRequirement / 100000).toFixed(2)}`, 
+                                text: `${(Math.round(turnoverRequirement * 100) / 100).toFixed(2)}`, 
                                 size: 20,
                                 font: "Arial"
                               }),
@@ -2779,8 +2816,9 @@ router.post('/generate', async (req: AuthRequest, res) => {
                                 }
                                 const contractYears = contractMonths / 12;
                                 const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
-                                return total + annualizedAmount;
-                              }, 0) || 0) / 100000).toFixed(2)}`, 
+                                // Convert to Lakhs (multiply by 100)
+                                return total + (annualizedAmount * 100);
+                              }, 0) || 0)).toFixed(2)}`, 
                               bold: true,
                               size: 20,
                               font: "Arial"
@@ -2810,9 +2848,11 @@ router.post('/generate', async (req: AuthRequest, res) => {
                                 }
                                 const contractYears = contractMonths / 12;
                                 const annualizedAmount = contractYears > 1 ? baseAmount / contractYears : baseAmount;
-                                const turnoverRequirement = annualizedAmount * 0.3;
+                                // Convert to Lakhs (multiply by 100) then calculate 30%
+                                const annualizedAmountInLakhs = annualizedAmount * 100;
+                                const turnoverRequirement = annualizedAmountInLakhs * 0.3;
                                 return total + turnoverRequirement;
-                              }, 0) || 0) / 100000).toFixed(2)}`, 
+                              }, 0) || 0)).toFixed(2)}`, 
                               bold: true,
                               size: 20,
                               font: "Arial"
@@ -3138,6 +3178,11 @@ router.post('/generate', async (req: AuthRequest, res) => {
                 ...bqcData.lots.map((lot: LotData, index: number) => {
                   const lotEMD = calculateEMD(lot.cecEstimateInclGst || 0, bqcData.tenderType || 'Goods');
                   
+                  // Convert CEC to Lakhs for display (1 Crore = 100 Lakhs)
+                  const lotCECInLakhs = (lot.cecEstimateInclGst || 0) * 100;
+                  
+                  console.log(`  EMD Table - Lot ${index + 1}: CEC=${lot.cecEstimateInclGst} Cr, CECInLakhs=${lotCECInLakhs}, EMD=${lotEMD}`);
+                  
                   return new TableRow({
                     children: [
                       new TableCell({
@@ -3175,7 +3220,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                           new Paragraph({
                             children: [
                               new TextRun({ 
-                                text: `${((lot.cecEstimateInclGst || 0) / 100000).toFixed(2)}`, 
+                                text: `${(Math.round(lotCECInLakhs * 100) / 100).toFixed(2)}`, 
                                 size: 20,
                                 font: "Arial"
                               }),
@@ -3243,7 +3288,10 @@ router.post('/generate', async (req: AuthRequest, res) => {
                         new Paragraph({
                           children: [
                             new TextRun({ 
-                              text: `${((bqcData.lots?.reduce((total: number, lot: LotData) => total + (lot.cecEstimateInclGst || 0), 0) || 0) / 100000).toFixed(2)}`, 
+                              text: `${((bqcData.lots?.reduce((total: number, lot: LotData) => {
+                                // Convert CEC to Lakhs (multiply by 100)
+                                return total + ((lot.cecEstimateInclGst || 0) * 100);
+                              }, 0) || 0)).toFixed(2)}`, 
                               bold: true,
                               size: 20,
                               font: "Arial"
