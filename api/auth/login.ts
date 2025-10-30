@@ -36,21 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Test database connection first
-    try {
-      await database.getUserByUsername('test');
-    } catch (dbError) {
-      console.error('Database connection test failed:', dbError);
-      return res.status(500).json({
-        success: false,
-        message: 'Database connection failed',
-        ...(process.env.NODE_ENV === 'development' && {
-          error: dbError instanceof Error ? dbError.message : 'Database error'
-        })
-      });
-    }
-
-    // Find user
+    // Find user (database connection tested implicitly)
     const user = await database.getUserByUsername(username);
     if (!user) {
       console.log('Login failed: user not found:', username);

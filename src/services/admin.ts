@@ -74,7 +74,19 @@ export interface BQCEntriesResponse {
 }
 
 class AdminService {
-  private baseURL = import.meta.env.VITE_API_URL || window.location.origin;
+  private baseURL: string;
+
+  constructor() {
+    // In production on Vercel, use relative paths (same origin)
+    // Only use VITE_API_URL if explicitly set (for custom API server)
+    const apiUrl = import.meta.env.VITE_API_URL;
+    if (apiUrl && apiUrl !== '') {
+      this.baseURL = apiUrl;
+    } else {
+      // Use relative paths when frontend and backend are on same domain
+      this.baseURL = '';
+    }
+  }
 
   private async makeAuthenticatedRequest(url: string, options: RequestInit = {}): Promise<Response> {
     const token = authService.getToken();
@@ -86,6 +98,7 @@ class AdminService {
         'Authorization': token ? `Bearer ${token}` : '',
         ...options.headers,
       },
+      credentials: 'include',
     });
   }
 

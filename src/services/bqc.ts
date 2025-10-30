@@ -3,7 +3,19 @@ import { API_ENDPOINTS } from '@/utils/constants';
 import { authService } from './auth';
 
 class BQCService {
-  private baseURL = import.meta.env.VITE_API_URL || window.location.origin;
+  private baseURL: string;
+
+  constructor() {
+    // In production on Vercel, use relative paths (same origin)
+    // Only use VITE_API_URL if explicitly set (for custom API server)
+    const apiUrl = import.meta.env.VITE_API_URL;
+    if (apiUrl && apiUrl !== '') {
+      this.baseURL = apiUrl;
+    } else {
+      // Use relative paths when frontend and backend are on same domain
+      this.baseURL = '';
+    }
+  }
 
   private async makeAuthenticatedRequest(url: string, options: RequestInit = {}): Promise<Response> {
     const token = authService.getToken();
@@ -15,6 +27,7 @@ class BQCService {
         'Authorization': token ? `Bearer ${token}` : '',
         ...options.headers,
       },
+      credentials: 'include',
     });
   }
 
@@ -25,11 +38,27 @@ class BQCService {
         body: JSON.stringify(data),
       });
 
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = {
+            success: false,
+            message: `Server error: ${response.status} ${response.statusText}`,
+          };
+        }
+        return errorData;
+      }
+
       return await response.json();
     } catch (error) {
+      console.error('Save BQC network error:', error);
       return {
         success: false,
-        message: 'Network error occurred. Please try again.',
+        message: error instanceof Error 
+          ? `Network error: ${error.message}. Please check your connection and try again.`
+          : 'Network error occurred. Please check your connection and try again.',
       };
     }
   }
@@ -37,11 +66,26 @@ class BQCService {
   async loadBQCData(id: number): Promise<ApiResponse<BQCData>> {
     try {
       const response = await this.makeAuthenticatedRequest(`${API_ENDPOINTS.BQC.LOAD}/${id}`);
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = {
+            success: false,
+            message: `Server error: ${response.status} ${response.statusText}`,
+          };
+        }
+        return errorData;
+      }
       return await response.json();
     } catch (error) {
+      console.error('Load BQC network error:', error);
       return {
         success: false,
-        message: 'Network error occurred. Please try again.',
+        message: error instanceof Error 
+          ? `Network error: ${error.message}. Please check your connection and try again.`
+          : 'Network error occurred. Please check your connection and try again.',
       };
     }
   }
@@ -49,11 +93,26 @@ class BQCService {
   async listBQCData(): Promise<ApiResponse<SavedBQCEntry[]>> {
     try {
       const response = await this.makeAuthenticatedRequest(API_ENDPOINTS.BQC.LIST);
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = {
+            success: false,
+            message: `Server error: ${response.status} ${response.statusText}`,
+          };
+        }
+        return errorData;
+      }
       return await response.json();
     } catch (error) {
+      console.error('List BQC network error:', error);
       return {
         success: false,
-        message: 'Network error occurred. Please try again.',
+        message: error instanceof Error 
+          ? `Network error: ${error.message}. Please check your connection and try again.`
+          : 'Network error occurred. Please check your connection and try again.',
       };
     }
   }
@@ -63,11 +122,26 @@ class BQCService {
       const response = await this.makeAuthenticatedRequest(`${API_ENDPOINTS.BQC.DELETE}/${id}`, {
         method: 'DELETE',
       });
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = {
+            success: false,
+            message: `Server error: ${response.status} ${response.statusText}`,
+          };
+        }
+        return errorData;
+      }
       return await response.json();
     } catch (error) {
+      console.error('Delete BQC network error:', error);
       return {
         success: false,
-        message: 'Network error occurred. Please try again.',
+        message: error instanceof Error 
+          ? `Network error: ${error.message}. Please check your connection and try again.`
+          : 'Network error occurred. Please check your connection and try again.',
       };
     }
   }
