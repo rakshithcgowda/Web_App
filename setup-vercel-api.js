@@ -69,15 +69,27 @@ function copyDir(src, dest) {
 }
 
 try {
-  // Copy API functions
-  copyDir(sourceApiDir, targetApiDir);
-  console.log('✅ API folder copied to root');
+// Copy only consolidated API files (not subdirectories)
+// This reduces function count for Vercel Hobby plan (12 function limit)
+const apiFiles = fs.readdirSync(sourceApiDir, { withFileTypes: true });
+for (const entry of apiFiles) {
+  const srcPath = path.join(sourceApiDir, entry.name);
+  const destPath = path.join(targetApiDir, entry.name);
+  
+  if (entry.isFile() && entry.name.endsWith('.ts')) {
+    // Copy only top-level API files (consolidated route handlers)
+    fs.copyFileSync(srcPath, destPath);
+  }
+  // Skip subdirectories (auth/, bqc/, admin/) - they're handled by consolidated files
+}
 
-  // Copy server directory (needed for imports)
-  copyDir(sourceServerDir, targetServerDir);
-  console.log('✅ Server directory copied to root');
+console.log('✅ Consolidated API files copied to root');
 
-  console.log('✅ Vercel deployment setup complete');
+// Copy server directory (needed for imports)
+copyDir(sourceServerDir, targetServerDir);
+console.log('✅ Server directory copied to root');
+
+console.log('✅ Vercel deployment setup complete');
 } catch (error) {
   console.error('❌ Setup failed:', error.message);
   process.exit(1);
