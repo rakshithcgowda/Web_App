@@ -26,5 +26,6 @@ dist-ssr
 .vercel
 
 # Vercel deployment folders (generated during build)
-api/
-server/
+# Only ignore root-level api/ and server/, not backend/api/ or backend/server/
+/api/
+/server/

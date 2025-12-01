@@ -9,4 +9,5 @@ backend/dist
 backend/server/dist
 frontend/node_modules
 backend/node_modules
+# IMPORTANT: backend/api and backend/server source files MUST be included for build
 
