@@ -69,18 +69,25 @@ function copyDir(src, dest) {
 }
 
 try {
-// Copy only consolidated API files (not subdirectories)
-// This reduces function count for Vercel Hobby plan (12 function limit)
+// Create target API directory if it doesn't exist
+if (!fs.existsSync(targetApiDir)) {
+  fs.mkdirSync(targetApiDir, { recursive: true });
+}
+
+// Copy all API files and subdirectories
+// This includes both consolidated route handlers and individual endpoint files
 const apiFiles = fs.readdirSync(sourceApiDir, { withFileTypes: true });
 for (const entry of apiFiles) {
   const srcPath = path.join(sourceApiDir, entry.name);
   const destPath = path.join(targetApiDir, entry.name);
   
   if (entry.isFile() && entry.name.endsWith('.ts')) {
-    // Copy only top-level API files (consolidated route handlers)
+    // Copy top-level API files (consolidated route handlers)
     fs.copyFileSync(srcPath, destPath);
+  } else if (entry.isDirectory()) {
+    // Copy subdirectories (auth/, bqc/, admin/) recursively
+    copyDir(srcPath, destPath);
   }
-  // Skip subdirectories (auth/, bqc/, admin/) - they're handled by consolidated files
 }
 
 console.log('✅ Consolidated API files copied to root');
