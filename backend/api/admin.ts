@@ -2,17 +2,17 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { database } from '../server/models/database-adapter.js';
 import { authenticateTokenVercel } from '../server/middleware/auth.js';
 
-// Import handlers from existing files
-import adminOverviewHandler from './admin/stats-overview.js';
-import adminGroupsHandler from './admin/stats-groups.js';
-import adminDateRangeHandler from './admin/stats-date-range.js';
-import adminUsersHandler from './admin/stats-users.js';
-import adminTenderTypesHandler from './admin/stats-tender-types.js';
-import adminFinancialHandler from './admin/stats-financial.js';
-import adminBQCEntriesHandler from './admin/bqc-entries.js';
-import adminUsersApprovalHandler from './admin/users.js';
-import adminExportHandler from './admin/export.js';
-import adminDbStatusHandler from './admin/db-status.js';
+// Import handlers from _handlers directory (not treated as API functions by Vercel)
+import adminOverviewHandler from '../_handlers/admin/stats-overview.js';
+import adminGroupsHandler from '../_handlers/admin/stats-groups.js';
+import adminDateRangeHandler from '../_handlers/admin/stats-date-range.js';
+import adminUsersHandler from '../_handlers/admin/stats-users.js';
+import adminTenderTypesHandler from '../_handlers/admin/stats-tender-types.js';
+import adminFinancialHandler from '../_handlers/admin/stats-financial.js';
+import adminBQCEntriesHandler from '../_handlers/admin/bqc-entries.js';
+import adminUsersApprovalHandler from '../_handlers/admin/users.js';
+import adminExportHandler from '../_handlers/admin/export.js';
+import adminDbStatusHandler from '../_handlers/admin/db-status.js';
 
 // Helper function to set CORS headers
 function setCORSHeaders(res: VercelResponse) {

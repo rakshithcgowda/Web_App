@@ -10,6 +10,7 @@ const __dirname = path.dirname(__filename);
 
 const sourceApiDir = path.join(__dirname, 'backend', 'api');
 const targetApiDir = path.join(__dirname, 'api');
+const targetHandlersDir = path.join(__dirname, '_handlers');
 const sourceServerDir = path.join(__dirname, 'backend', 'server');
 const targetServerDir = path.join(__dirname, 'server');
 
@@ -36,16 +37,19 @@ if (!fs.existsSync(sourceServerDir)) {
   process.exit(1);
 }
 
-// Remove existing api and server folders if they exist
+// Remove existing api, handlers, and server folders if they exist
 if (fs.existsSync(targetApiDir)) {
   fs.rmSync(targetApiDir, { recursive: true, force: true });
+}
+if (fs.existsSync(targetHandlersDir)) {
+  fs.rmSync(targetHandlersDir, { recursive: true, force: true });
 }
 if (fs.existsSync(targetServerDir)) {
   fs.rmSync(targetServerDir, { recursive: true, force: true });
 }
 
 // Copy the entire backend/api directory to api/
-function copyDir(src, dest) {
+function copyDir(src, dest, fixImports = false) {
   if (!fs.existsSync(src)) {
     throw new Error(`Source directory does not exist: ${src}`);
   }
@@ -61,36 +65,49 @@ function copyDir(src, dest) {
     const destPath = path.join(dest, entry.name);
 
     if (entry.isDirectory()) {
-      copyDir(srcPath, destPath);
+      copyDir(srcPath, destPath, fixImports);
     } else {
-      fs.copyFileSync(srcPath, destPath);
+      if (fixImports && entry.name.endsWith('.ts')) {
+        // Fix import paths: ../server/ -> ../../server/
+        let content = fs.readFileSync(srcPath, 'utf8');
+        content = content.replace(/from ['"]\.\.\/server\//g, "from '../../server/");
+        fs.writeFileSync(destPath, content, 'utf8');
+      } else {
+        fs.copyFileSync(srcPath, destPath);
+      }
     }
   }
 }
 
 try {
-// Create target API directory if it doesn't exist
+// Create target directories if they don't exist
 if (!fs.existsSync(targetApiDir)) {
   fs.mkdirSync(targetApiDir, { recursive: true });
 }
+if (!fs.existsSync(targetHandlersDir)) {
+  fs.mkdirSync(targetHandlersDir, { recursive: true });
+}
 
-// Copy all API files and subdirectories
-// This includes both consolidated route handlers and individual endpoint files
+// Copy only top-level API files (consolidated route handlers) to api/
+// Copy subdirectories to _handlers/ (Vercel ignores directories starting with _)
 const apiFiles = fs.readdirSync(sourceApiDir, { withFileTypes: true });
 for (const entry of apiFiles) {
   const srcPath = path.join(sourceApiDir, entry.name);
-  const destPath = path.join(targetApiDir, entry.name);
   
   if (entry.isFile() && entry.name.endsWith('.ts')) {
-    // Copy top-level API files (consolidated route handlers)
+    // Copy top-level API files (consolidated route handlers) to api/
+    const destPath = path.join(targetApiDir, entry.name);
     fs.copyFileSync(srcPath, destPath);
   } else if (entry.isDirectory()) {
-    // Copy subdirectories (auth/, bqc/, admin/) recursively
-    copyDir(srcPath, destPath);
+    // Copy subdirectories to _handlers/ (won't be treated as API functions)
+    // Fix import paths: ../server/ -> ../../server/ since handlers are one level deeper
+    const destPath = path.join(targetHandlersDir, entry.name);
+    copyDir(srcPath, destPath, true);
   }
 }
 
 console.log('✅ Consolidated API files copied to root');
+console.log('✅ Handler files copied to _handlers/');
 
 // Copy server directory (needed for imports)
 copyDir(sourceServerDir, targetServerDir);
