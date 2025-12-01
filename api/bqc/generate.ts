@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateTokenVercel } from '../../server/middleware/auth.js';
+import { authenticateTokenVercel } from '../server/middleware/auth.js';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType } from 'docx';
+import { convertHtmlToWordRuns } from '../server/utils/htmlToWord.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers
@@ -1343,6 +1344,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             spacing: { after: 400 },
           }),
 
+          // Additional Details
+          ...(bqcData.additionalDetails ? [
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "ADDITIONAL DETAILS", 
+                  bold: true, 
+                  size: 22,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { before: 200, after: 200 },
+            }),
+            
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: bqcData.additionalDetails, 
+                  size: 22,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 400 },
+            }),
+          ] : []),
+          
+          // Explanatory Note for Additional Details
+          ...(bqcData.hasAdditionalExplanatoryNote && bqcData.additionalExplanatoryNote ? [
+            new Paragraph({
+              children: convertHtmlToWordRuns(bqcData.additionalExplanatoryNote),
+              spacing: { after: 200 },
+            }),
+          ] : []),
+
           // 3.2 FINANCIAL CRITERIA
           new Paragraph({
             children: [
@@ -1609,7 +1644,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           new Paragraph({
             children: [
               new TextRun({ 
-                text: "* Explanatory Note:\nThe annual average turnover is calculated as the 30% of the per LOT Annualized Estimate Value. Average annual turnover values in-line with CTE Office Memorandum No. 12-02-1-CTE-6 dated 17th Dec 2002\nDocuments Required: Please refer the ITB (Instruction to Bidders) which mentions the documents to be submitted by bidders for meeting the above Technical and Financial criteria, ITB is enclosed as Annexure-III",
+                text: "* Explanatory Note:\nThe annual average turnover is calculated as the 30% of the per LOT Annualized Estimate Value.\nDocuments Required: Please refer the ITB (Instruction to Bidders) which mentions the documents to be submitted by bidders for meeting the above Technical and Financial criteria, ITB is enclosed as Annexure-III",
                 size: 22,
                 font: "Arial"
               }),
@@ -1641,7 +1676,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             spacing: { after: 400 },
           }),
 
-          // 5.0 EARNEST MONEY DEPOSIT
+          // 5.0 EARNEST MONEY DEPOSIT - Only show if hasEMDPreview is checked
+          ...(bqcData.hasEMDPreview ? [
           new Paragraph({
             children: [
               new TextRun({ 
@@ -1837,6 +1873,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ],
             spacing: { after: 400 },
           }),
+          ] : []),
 
           // 6.0 PERFORMANCE SECURITY DEPOSIT
           new Paragraph({

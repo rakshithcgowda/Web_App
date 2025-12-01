@@ -23,21 +23,6 @@ export function PreambleSection({ data, onChange }: PreambleSectionProps) {
           <p className="text-gray-600 mt-1">Enter the basic details for your BQC document</p>
         </div>
         <div className="card-body space-y-8">
-        {/* Reference Number */}
-        <div className="form-group">
-          <label htmlFor="refNumber" className="form-label text-lg">
-            Reference Number *
-          </label>
-          <input
-            type="text"
-            id="refNumber"
-            className="form-input h-12 text-base"
-            placeholder="Enter reference number (e.g., TENDER/2024/001)"
-            value={data.refNumber}
-            onChange={(e) => onChange({ refNumber: e.target.value })}
-          />
-        </div>
-
         {/* Subject */}
         <div className="form-group">
           <label htmlFor="subject" className="form-label text-lg">

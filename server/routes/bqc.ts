@@ -757,82 +757,6 @@ router.post('/generate', async (req: AuthRequest, res) => {
                   }),
                 ],
               }),
-              // Reference Number
-              new TableRow({
-                children: [
-                  new TableCell({
-                    children: [
-                      new Paragraph({
-                        children: [
-                          new TextRun({ 
-                            text: "Reference Number", 
-                            bold: true, 
-                            size: 24,
-                            font: "Arial"
-                          }),
-                        ],
-                        alignment: AlignmentType.LEFT,
-                        spacing: { after: 100 },
-                      }),
-                    ],
-                    width: { size: 30, type: WidthType.PERCENTAGE },
-                  }),
-                  new TableCell({
-                    children: [
-                      new Paragraph({
-                        children: [
-                          new TextRun({ 
-                            text: bqcData.refNumber || "N/A", 
-                            size: 24,
-                            font: "Arial"
-                          }),
-                        ],
-                        alignment: AlignmentType.LEFT,
-                        spacing: { after: 100 },
-                      }),
-                    ],
-                    width: { size: 70, type: WidthType.PERCENTAGE },
-                  }),
-                ],
-              }),
-              // Procurement Group
-              new TableRow({
-                children: [
-                  new TableCell({
-                    children: [
-                      new Paragraph({
-                        children: [
-                          new TextRun({ 
-                            text: "Procurement Group", 
-                            bold: true, 
-                            size: 24,
-                            font: "Arial"
-                          }),
-                        ],
-                        alignment: AlignmentType.LEFT,
-                        spacing: { after: 100 },
-                      }),
-                    ],
-                    width: { size: 30, type: WidthType.PERCENTAGE },
-                  }),
-                  new TableCell({
-                    children: [
-                      new Paragraph({
-                        children: [
-                          new TextRun({ 
-                            text: bqcData.groupName || "N/A", 
-                            size: 24,
-                            font: "Arial"
-                          }),
-                        ],
-                        alignment: AlignmentType.LEFT,
-                        spacing: { after: 100 },
-                      }),
-                    ],
-                    width: { size: 70, type: WidthType.PERCENTAGE },
-                  }),
-                ],
-              }),
               // Tender Description
               new TableRow({
                 children: [
@@ -1802,10 +1726,10 @@ router.post('/generate', async (req: AuthRequest, res) => {
                 spacing: { after: 200 },
               }),
               
-              // Experience Requirements - Dynamic based on methodology and MSE relaxation
-              // Only show for Lot-wise OR for least cash outflow when MSE relaxation is checked
+              // Experience Requirements - Always show for Works/Service with least cash outflow
+              // Show for Lot-wise OR for least cash outflow (regardless of MSE relaxation)
               ...((bqcData.tenderType === 'Service' || bqcData.tenderType === 'Works') && 
-                  (bqcData.evaluationMethodology === 'Lot-wise' || bqcData.mseRelaxation) ? [
+                  (bqcData.evaluationMethodology === 'Lot-wise' || bqcData.evaluationMethodology === 'least cash outflow') ? [
                 new Paragraph({
                   children: [
                     new TextRun({ 
@@ -1836,7 +1760,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                   new Paragraph({
                     children: [
                       new TextRun({ 
-                        text: `One similar completed work costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionC.value / 0.85 : 0)}.`, 
+                        text: `Three similar completed works each costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionA.value / 0.85 : 0)}.`, 
                         size: 24,
                         font: "Arial"
                       }),
@@ -1880,7 +1804,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
                   new Paragraph({
                     children: [
                       new TextRun({ 
-                        text: `Three similar completed works each costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionA.value / 0.85 : 0)}.`, 
+                        text: `One similar completed work costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionC.value / 0.85 : 0)}.`, 
                         size: 24,
                         font: "Arial"
                       }),
@@ -1889,25 +1813,12 @@ router.post('/generate', async (req: AuthRequest, res) => {
                   }),
                 ] : []),
                 
-                // Show MSE-specific content for least cash outflow when MSE relaxation is enabled
-                ...(bqcData.evaluationMethodology === 'least cash outflow' && bqcData.mseRelaxation ? [
-                  // MSE Relaxed Requirements
+                // Show standard requirements for least cash outflow when MSE relaxation is NOT enabled
+                ...(bqcData.evaluationMethodology === 'least cash outflow' && !bqcData.mseRelaxation ? [
                   new Paragraph({
                     children: [
                       new TextRun({ 
-                        text: "MSE Relaxed Requirements (15% reduction):", 
-                        bold: true,
-                        size: 24,
-                        font: "Arial"
-                      }),
-                    ],
-                    spacing: { after: 100 },
-                  }),
-                  
-                  new Paragraph({
-                    children: [
-                      new TextRun({ 
-                        text: `One similar completed work costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionC.value : 0)}.`, 
+                        text: `Three similar completed works each costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionA.value : 0)}.`, 
                         size: 24,
                         font: "Arial"
                       }),
@@ -1951,7 +1862,78 @@ router.post('/generate', async (req: AuthRequest, res) => {
                   new Paragraph({
                     children: [
                       new TextRun({ 
+                        text: `One similar completed work costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionC.value : 0)}.`, 
+                        size: 24,
+                        font: "Arial"
+                      }),
+                    ],
+                    spacing: { after: 200 },
+                  }),
+                ] : []),
+                
+                // Show MSE-specific content for least cash outflow when MSE relaxation is enabled
+                ...(bqcData.evaluationMethodology === 'least cash outflow' && bqcData.mseRelaxation ? [
+                  // MSE Relaxed Requirements
+                  new Paragraph({
+                    children: [
+                      new TextRun({ 
+                        text: "MSE Relaxed Requirements (15% reduction):", 
+                        bold: true,
+                        size: 24,
+                        font: "Arial"
+                      }),
+                    ],
+                    spacing: { after: 100 },
+                  }),
+                  
+                  new Paragraph({
+                    children: [
+                      new TextRun({ 
                         text: `Three similar completed works each costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionA.value : 0)}.`, 
+                        size: 24,
+                        font: "Arial"
+                      }),
+                    ],
+                    spacing: { after: 100 },
+                  }),
+                  
+                  new Paragraph({
+                    children: [
+                      new TextRun({ 
+                        text: "or", 
+                        size: 24,
+                        font: "Arial"
+                      }),
+                    ],
+                    spacing: { after: 100 },
+                  }),
+                  
+                  new Paragraph({
+                    children: [
+                      new TextRun({ 
+                        text: `Two similar completed works each costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionB.value : 0)}.`, 
+                        size: 24,
+                        font: "Arial"
+                      }),
+                    ],
+                    spacing: { after: 100 },
+                  }),
+                  
+                  new Paragraph({
+                    children: [
+                      new TextRun({ 
+                        text: "or", 
+                        size: 24,
+                        font: "Arial"
+                      }),
+                    ],
+                    spacing: { after: 100 },
+                  }),
+                  
+                  new Paragraph({
+                    children: [
+                      new TextRun({ 
+                        text: `One similar completed work costing not less than ${formatExperienceCurrency(experienceRequirements ? experienceRequirements.optionC.value : 0)}.`, 
                         size: 24,
                         font: "Arial"
                       }),
@@ -1963,7 +1945,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
               new Paragraph({
                 children: [
                   new TextRun({ 
-                    text: `Definition of "similar work" should be clearly defined: ${bqcData.similarWorkDefinition || "N/A"}`, 
+                    text: `Definition of the similar work should be considered as following: ${bqcData.similarWorkDefinition || "N/A"}`, 
                     size: 24,
                     font: "Arial"
                   }),
@@ -2544,6 +2526,40 @@ router.post('/generate', async (req: AuthRequest, res) => {
             }),
           ] : []),
           
+          // Additional Details
+          ...(bqcData.additionalDetails ? [
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "ADDITIONAL DETAILS", 
+                  bold: true, 
+                  size: 24,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 200 },
+            }),
+            
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: bqcData.additionalDetails, 
+                  size: 24,
+                  font: "Arial"
+                }),
+              ],
+              spacing: { after: 400 },
+            }),
+          ] : []),
+          
+          // Explanatory Note for Additional Details
+          ...(bqcData.hasAdditionalExplanatoryNote && bqcData.additionalExplanatoryNote ? [
+            new Paragraph({
+              children: convertHtmlToWordRuns(bqcData.additionalExplanatoryNote),
+              spacing: { after: 200 },
+            }),
+          ] : []),
+          
           // Financial Criteria
           new Paragraph({
             children: [
@@ -2901,7 +2917,8 @@ router.post('/generate', async (req: AuthRequest, res) => {
               spacing: { after: 200 },
             }),
           ]),
-              
+          
+          // 3.2.2 NET WORTH
                       new Paragraph({
                         children: [
                           new TextRun({ 
@@ -2993,14 +3010,6 @@ router.post('/generate', async (req: AuthRequest, res) => {
             })
           ] : []),
           
-          // Explanatory Note for Additional Details
-          ...(bqcData.hasAdditionalExplanatoryNote && bqcData.additionalExplanatoryNote ? [
-            new Paragraph({
-              children: convertHtmlToWordRuns(bqcData.additionalExplanatoryNote),
-              spacing: { after: 200 },
-            }),
-          ] : []),
-          
           // Evaluation Methodology
                       new Paragraph({
                         children: [
@@ -3060,7 +3069,8 @@ router.post('/generate', async (req: AuthRequest, res) => {
             spacing: { after: 400 },
           }),
           
-          // EMD
+          // EMD - Only show if hasEMDPreview is checked
+          ...(bqcData.hasEMDPreview ? [
           new Paragraph({
             children: [
               new TextRun({ 
@@ -3375,6 +3385,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
               spacing: { after: 200 },
             }),
           ] : []),
+          ] : []),
           
           // Performance Security - Only if enabled
           ...(bqcData.hasPerformanceSecurity ? [
@@ -3418,7 +3429,7 @@ router.post('/generate', async (req: AuthRequest, res) => {
           new Paragraph({
             children: [
               new TextRun({ 
-                text: "In view of above, approval is requested:", 
+                text: `In view of above, approval is requested for the supply of ${bqcData.tenderDescription || 'the tender'}/job ${bqcData.tenderDescription || 'the tender'} for`, 
                 size: 24,
                 font: "Arial"
               }),

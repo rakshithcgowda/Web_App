@@ -1,20 +1,25 @@
 import 'dotenv/config';
 import { config } from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Load .env.local file explicitly
-config({ path: '.env.local' });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load .env.local from root directory (two levels up from server/)
+if (process.env.NODE_ENV !== 'production') {
+  const envPath = path.join(__dirname, '../../.env.local');
+  config({ path: envPath });
+  console.log(`Loading environment from: ${envPath}`);
+}
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import authRoutes from './routes/auth.js';
 import bqcRoutes from './routes/bqc.js';
 import adminRoutes from './routes/admin.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -59,9 +64,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/bqc', bqcRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Serve static files from dist in production
+// Serve static files from frontend dist in production
 if (process.env.NODE_ENV === 'production') {
-  const distPath = path.join(__dirname, '../dist');
+  const distPath = path.join(__dirname, '../../frontend/dist');
   app.use(express.static(distPath));
   
   // Serve index.html for all non-API routes (SPA routing)
@@ -95,6 +100,15 @@ app.listen(PORT, () => {
   console.log(`🚀 BQC Generator API server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔐 Environment: ${process.env.NODE_ENV || 'development'}`);
+});
+
+// Prevent process from exiting on unhandled errors; log them instead
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
 });
 
 // Graceful shutdown

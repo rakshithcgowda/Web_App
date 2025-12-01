@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Vercel deployment folders (generated during build)
+api/
+server/

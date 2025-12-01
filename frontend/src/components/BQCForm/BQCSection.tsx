@@ -684,7 +684,7 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
           {/* Annual Turnover Section - Only for Lot-wise */}
           {data.evaluationMethodology === 'Lot-wise' ? (
             <div className="mb-6 p-4 bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg">
-              <h6 className="text-lg font-semibold text-green-900 mb-4">3.2.1 ANNUAL TURNOVER</h6>
+              <h6 className="text-lg font-semibold text-green-900 mb-4">3.2.1 Average ANNUAL TURNOVER</h6>
               <p className="text-sm text-green-800 mb-4">
                 The bidder should have achieved a minimum Average Annual financial turnover as per below table (LOT-WISE) as per Audited Balance sheet and P&L Statement in the last three* accounting years prior to due date of bid submission.
               </p>
@@ -838,6 +838,16 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
             </div>
           )}
 
+          {/* Explanatory Note for Financial Criteria - Below Annual Turnover Requirement */}
+          <ExplanatoryNote
+            label="Financial Criteria"
+            checked={data.hasFinancialExplanatoryNote || false}
+            onCheckedChange={(checked) => onChange({ hasFinancialExplanatoryNote: checked })}
+            value={data.financialExplanatoryNote || ''}
+            onValueChange={(value) => onChange({ financialExplanatoryNote: value })}
+            placeholder="Add any additional information about financial criteria..."
+          />
+
           {/* Net Worth Section */}
           <div className="mb-6 p-4 bg-gradient-to-br from-orange-50 to-red-50 border border-orange-200 rounded-lg">
             <h6 className="text-lg font-semibold text-orange-900 mb-4">3.2.2 NET WORTH</h6>
@@ -849,16 +859,6 @@ export function BQCSection({ data, onChange, calculatedValues }: BQCSectionProps
 
 
         </div>
-
-        {/* Explanatory Note for Financial Criteria */}
-        <ExplanatoryNote
-          label="Financial Criteria"
-          checked={data.hasFinancialExplanatoryNote || false}
-          onCheckedChange={(checked) => onChange({ hasFinancialExplanatoryNote: checked })}
-          value={data.financialExplanatoryNote || ''}
-          onValueChange={(value) => onChange({ financialExplanatoryNote: value })}
-          placeholder="Add any additional information about financial criteria..."
-        />
         </div>
       </div>
     </div>

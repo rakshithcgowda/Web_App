@@ -250,6 +250,12 @@ router.post('/users', async (req: AuthRequest, res) => {
     }
 
     if (action === 'approve') {
+      if (!req.userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authentication required'
+        });
+      }
       await database.approveUser(userId, req.userId);
       res.json({
         success: true,

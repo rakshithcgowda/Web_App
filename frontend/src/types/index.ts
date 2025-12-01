@@ -117,6 +117,7 @@ export interface BQCData {
   financialExplanatoryNote?: string;
   hasEMDExplanatoryNote?: boolean;
   emdExplanatoryNote?: string;
+  hasEMDPreview?: boolean; // Control visibility of EMD Preview in output
   hasPastPerformanceExplanatoryNote?: boolean;
   pastPerformanceExplanatoryNote?: string;
   // MSE Relaxation for Past Performance Requirement

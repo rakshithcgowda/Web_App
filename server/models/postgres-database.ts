@@ -115,6 +115,7 @@ class PostgresDatabase {
           financial_explanatory_note TEXT,
           has_emd_explanatory_note BOOLEAN DEFAULT FALSE,
           emd_explanatory_note TEXT,
+          has_emd_preview BOOLEAN DEFAULT FALSE,
           has_past_performance_explanatory_note BOOLEAN DEFAULT FALSE,
           past_performance_explanatory_note TEXT,
           past_performance_mse_relaxation BOOLEAN DEFAULT FALSE,
@@ -123,6 +124,17 @@ class PostgresDatabase {
           FOREIGN KEY (user_id) REFERENCES users (id)
         )
       `;
+
+      // Add has_emd_preview column if it doesn't exist (migration)
+      try {
+        await sql`
+          ALTER TABLE bqc_data 
+          ADD COLUMN IF NOT EXISTS has_emd_preview BOOLEAN DEFAULT FALSE
+        `;
+        console.log('has_emd_preview column added/verified');
+      } catch (error) {
+        console.log('Error adding has_emd_preview column (may already exist):', error);
+      }
     } catch (error) {
       console.error('Database setup error:', error);
       console.error('Database error details:', {
@@ -284,6 +296,7 @@ class PostgresDatabase {
           financial_explanatory_note = ${bqcData.financialExplanatoryNote || ''},
           has_emd_explanatory_note = ${bqcData.hasEMDExplanatoryNote || false},
           emd_explanatory_note = ${bqcData.emdExplanatoryNote || ''},
+          has_emd_preview = ${bqcData.hasEMDPreview || false},
           has_past_performance_explanatory_note = ${bqcData.hasPastPerformanceExplanatoryNote || false},
           past_performance_explanatory_note = ${bqcData.pastPerformanceExplanatoryNote || ''},
           past_performance_mse_relaxation = ${bqcData.pastPerformanceMseRelaxation || false},
@@ -307,7 +320,7 @@ class PostgresDatabase {
           o_m_value, o_m_period, has_om, additional_details, note_to, commercial_evaluation_method,
           has_experience_explanatory_note, experience_explanatory_note, has_additional_explanatory_note, additional_explanatory_note,
           has_financial_explanatory_note, financial_explanatory_note, has_emd_explanatory_note, emd_explanatory_note,
-          has_past_performance_explanatory_note, past_performance_explanatory_note, past_performance_mse_relaxation
+          has_emd_preview, has_past_performance_explanatory_note, past_performance_explanatory_note, past_performance_mse_relaxation
         ) VALUES (
           ${userId}, ${bqcData.refNumber}, ${bqcData.groupName}, ${bqcData.subject}, ${bqcData.tenderDescription},
           ${bqcData.prReference}, ${bqcData.tenderType}, ${bqcData.evaluationMethodology}, ${bqcData.cecEstimateInclGst},
@@ -325,6 +338,7 @@ class PostgresDatabase {
           ${bqcData.hasAdditionalExplanatoryNote || false}, ${bqcData.additionalExplanatoryNote || ''},
           ${bqcData.hasFinancialExplanatoryNote || false}, ${bqcData.financialExplanatoryNote || ''},
           ${bqcData.hasEMDExplanatoryNote || false}, ${bqcData.emdExplanatoryNote || ''},
+          ${bqcData.hasEMDPreview || false},
           ${bqcData.hasPastPerformanceExplanatoryNote || false}, ${bqcData.pastPerformanceExplanatoryNote || ''},
           ${bqcData.pastPerformanceMseRelaxation || false}
         ) RETURNING id
