@@ -1,4 +1,27 @@
-import { sql } from '@vercel/postgres';
+import { Pool } from 'pg';
+
+// Lazy-load connection pool - only create when needed
+let pool: Pool | null = null;
+
+function getPool(): Pool {
+  if (!pool) {
+    pool = new Pool({
+      connectionString: process.env.POSTGRES_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
+  }
+  return pool;
+}
+
+// Helper function to execute queries using pg library
+async function sql(strings: TemplateStringsArray, ...values: any[]) {
+  let query = strings[0];
+  for (let i = 0; i < values.length; i++) {
+    query += `$${i + 1}` + strings[i + 1];
+  }
+  const result = await getPool().query(query, values);
+  return result;
+}
 
 class PostgresDatabase {
   constructor() {
@@ -713,4 +736,12 @@ class PostgresDatabase {
   }
 }
 
-export const postgresDatabase = new PostgresDatabase();
+// Lazy-load PostgreSQL database - only create instance when needed
+let _postgresDatabaseInstance: PostgresDatabase | null = null;
+
+export function getPostgresDatabase(): PostgresDatabase {
+  if (!_postgresDatabaseInstance) {
+    _postgresDatabaseInstance = new PostgresDatabase();
+  }
+  return _postgresDatabaseInstance;
+}

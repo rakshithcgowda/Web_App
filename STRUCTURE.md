@@ -22,7 +22,7 @@ x/
 │   │   ├── models/      # Database models
 │   │   ├── middleware/  # Express middleware
 │   │   └── utils/       # Utility functions
-│   ├── api/             # Vercel serverless functions (optional)
+│   ├── api/             # API serverless functions (optional, if needed)
 │   ├── package.json     # Backend dependencies
 │   └── .env.example     # Backend environment variables template
 │
@@ -113,7 +113,7 @@ npm run build:backend
 
 #### Option 1: Separate Deployments
 
-- **Frontend**: Deploy the `frontend/` folder to a static hosting service (Vercel, Netlify, etc.)
+- **Frontend**: Deploy the `frontend/` folder to a static hosting service (Netlify, etc.)
 - **Backend**: Deploy the `backend/` folder to a Node.js hosting service (Railway, Render, etc.)
 
 Set `VITE_API_URL` in the frontend environment to point to your backend URL.

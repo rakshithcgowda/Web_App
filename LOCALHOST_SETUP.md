@@ -149,3 +149,5 @@ Make sure `.env.local` is in the **root directory** (same level as `package.json
 - Check the browser console and terminal for any errors
 - Backend logs will show in the terminal where you ran `npm run dev:backend`
 
+
+

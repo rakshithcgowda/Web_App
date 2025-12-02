@@ -40,7 +40,6 @@
 | **Railway** ⭐ | ⭐⭐⭐⭐⭐ (Easiest) | $5 credit/month | **Recommended** |
 | **Render** | ⭐⭐⭐⭐ | 750 hrs/month | Simple alternative |
 | **Netlify** | ⭐⭐⭐ | Generous | Frontend-focused |
-| **Vercel** | ⭐⭐⭐ | Generous | Serverless functions |
 
 ---
 

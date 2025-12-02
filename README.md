@@ -213,7 +213,7 @@ VITE_API_URL=https://your-api-domain.com
    ```
 
 ### Deployment Options
-- **Vercel/Netlify**: For frontend static hosting
+- **Netlify**: For frontend static hosting
 - **Railway/Render**: For full-stack deployment
 - **VPS**: Traditional server deployment
 - **PM2**: Process management for production

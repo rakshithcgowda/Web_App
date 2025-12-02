@@ -1,16 +1,12 @@
 {
   "name": "bqc-generator-backend",
-  "private": true,
   "version": "0.0.0",
   "type": "module",
-  "engines": {
-    "node": "20.x"
-  },
+  "main": "server/index.ts",
   "scripts": {
-    "dev": "nodemon --exec tsx server/index.ts",
-    "build": "tsc --project server/tsconfig.json",
-    "start": "tsx server/index.ts",
-    "lint": "eslint ."
+    "dev": "tsx watch server/index.ts",
+    "build": "tsc",
+    "start": "node dist/server/index.js"
   },
   "dependencies": {
     "@vercel/node": "^5.4.0",
@@ -24,6 +20,7 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
+    "pg": "^8.13.1",
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {
@@ -34,11 +31,14 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.0.0",
     "@types/node": "^24.5.2",
+    "@types/pg": "^8.11.10",
     "eslint": "^9.36.0",
     "nodemon": "^3.1.10",
     "tsx": "^4.20.5",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.44.0"
+  },
+  "engines": {
+    "node": "20.x"
   }
 }
-

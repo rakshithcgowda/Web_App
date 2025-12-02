@@ -25,7 +25,7 @@ function getAppDataDir(): string {
 const APP_DATA_DIR = getAppDataDir();
 const DB_PATH = path.join(APP_DATA_DIR, 'user_data.db');
 
-class Database {
+export class Database {
   private db: sqlite3.Database;
 
   constructor() {
@@ -42,6 +42,9 @@ class Database {
         password TEXT NOT NULL,
         email TEXT,
         full_name TEXT,
+        is_approved INTEGER DEFAULT 1,
+        approved_at TIMESTAMP,
+        approved_by INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -159,6 +162,24 @@ class Database {
       });
     });
 
+    // Add migration for user approval columns
+    const userApprovalColumns = [
+      'is_approved INTEGER DEFAULT 1',
+      'approved_at TIMESTAMP',
+      'approved_by INTEGER'
+    ];
+
+    userApprovalColumns.forEach(field => {
+      this.db.run(`
+        ALTER TABLE users ADD COLUMN ${field}
+      `, (err) => {
+        // Ignore error if column already exists
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error(`Error adding ${field} column:`, err);
+        }
+      });
+    });
+
     // Add migration for missing columns that might not exist
     const missingColumns = [
       'evaluation_methodology TEXT',
@@ -262,13 +283,87 @@ class Database {
   async getUserById(id: number): Promise<any> {
     return new Promise((resolve, reject) => {
       this.db.get(
-        'SELECT id, username, email, full_name, created_at FROM users WHERE id = ?',
+        'SELECT id, username, email, full_name, is_approved, approved_at, approved_by, created_at FROM users WHERE id = ?',
         [id],
         (err, row) => {
           if (err) {
             reject(err);
           } else {
             resolve(row);
+          }
+        }
+      );
+    });
+  }
+
+  // User approval methods
+  async getPendingUsers(): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        'SELECT id, username, email, full_name, created_at FROM users WHERE is_approved = 0 OR is_approved IS NULL ORDER BY created_at ASC',
+        (err, rows) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(rows || []);
+          }
+        }
+      );
+    });
+  }
+
+  async approveUser(userId: number, approvedBy: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'UPDATE users SET is_approved = 1, approved_at = CURRENT_TIMESTAMP, approved_by = ? WHERE id = ?',
+        [approvedBy, userId],
+        (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  }
+
+  async rejectUser(userId: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'DELETE FROM users WHERE id = ? AND (is_approved = 0 OR is_approved IS NULL)',
+        [userId],
+        (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  }
+
+  async getAllUsers(): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        `SELECT 
+          u.id, 
+          u.username, 
+          u.email, 
+          u.full_name, 
+          u.is_approved, 
+          u.approved_at, 
+          u.created_at,
+          approver.username as approved_by_username
+        FROM users u
+        LEFT JOIN users approver ON u.approved_by = approver.id
+        ORDER BY u.created_at DESC`,
+        (err, rows) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(rows || []);
           }
         }
       );
@@ -915,6 +1010,75 @@ class Database {
           }
         }
       });
+    });
+  }
+
+  // Admin statistics methods - alias for compatibility
+  async getAdminStatsOverview(filters: {
+    startDate?: string;
+    endDate?: string;
+    groupName?: string;
+  } = {}): Promise<any> {
+    return this.getBQCStats(filters);
+  }
+
+  async getAdminStatsGroups(filters: {
+    startDate?: string;
+    endDate?: string;
+    groupName?: string;
+  } = {}): Promise<any[]> {
+    return this.getBQCGroupStats(filters);
+  }
+
+  async getAdminStatsDateRange(filters: {
+    startDate?: string;
+    endDate?: string;
+    groupBy: 'day' | 'week' | 'month';
+  }): Promise<any[]> {
+    return this.getBQCDateRangeStats(filters);
+  }
+
+  async getAdminStatsUsers(): Promise<any> {
+    return this.getUserStats();
+  }
+
+  async getAdminStatsTenderTypes(filters: {
+    startDate?: string;
+    endDate?: string;
+    groupName?: string;
+  } = {}): Promise<any[]> {
+    return this.getTenderTypeStats(filters);
+  }
+
+  async getAdminStatsFinancial(filters: {
+    startDate?: string;
+    endDate?: string;
+    groupName?: string;
+  } = {}): Promise<any> {
+    return this.getFinancialStats(filters);
+  }
+
+  async getAdminBQCEntries(filters: {
+    page: number;
+    limit: number;
+    startDate?: string;
+    endDate?: string;
+    groupName?: string;
+    tenderType?: string;
+    search?: string;
+  }): Promise<{ entries: any[]; total: number; totalPages: number }> {
+    return this.getBQCEntries(filters);
+  }
+
+  async getAdminExportData(filters: {
+    format: string;
+    startDate?: string;
+    endDate?: string;
+    groupName?: string;
+  }): Promise<string> {
+    return this.exportBQCData({
+      ...filters,
+      format: filters.format as 'csv' | 'excel'
     });
   }
 

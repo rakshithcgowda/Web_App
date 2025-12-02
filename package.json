@@ -13,8 +13,6 @@
     "build": "npm run build:frontend && npm run build:backend",
     "build:frontend": "cd frontend && npm run build",
     "build:backend": "cd backend && npm run build",
-    "setup:vercel": "node setup-vercel-api.js",
-    "vercel-build": "cd backend && npm install && cd .. && npm run setup:vercel && cd frontend && npm install && npm run build",
     "start": "cd backend && npm start",
     "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
     "lint": "npm run lint:frontend && npm run lint:backend",
@@ -22,8 +20,6 @@
     "lint:backend": "cd backend && npm run lint"
   },
   "dependencies": {
-    "@vercel/node": "^5.4.0",
-    "@vercel/postgres": "^0.10.0",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "docx": "^9.5.1",

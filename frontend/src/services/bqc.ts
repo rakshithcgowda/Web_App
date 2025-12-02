@@ -6,7 +6,7 @@ class BQCService {
   private baseURL: string;
 
   constructor() {
-    // In production on Vercel, use relative paths (same origin)
+    // In production, use relative paths (same origin)
     // Only use VITE_API_URL if explicitly set (for custom API server)
     const apiUrl = import.meta.env.VITE_API_URL;
     if (apiUrl && apiUrl !== '') {

@@ -101,7 +101,7 @@
 
 ---
 
-## 🔷 Option 3: Netlify (If you prefer Vercel-like platform)
+## 🔷 Option 3: Netlify
 
 ### Why Netlify?
 - ✅ **Excellent for Frontend**: Great static site hosting
@@ -163,7 +163,6 @@ fly launch
 | **Render** | ⭐⭐⭐⭐ | 750 hrs/month | ✅ Included | Simple + reliable |
 | **Netlify** | ⭐⭐⭐ | Generous | ❌ External needed | Frontend-focused |
 | **Fly.io** | ⭐⭐⭐ | Good | ✅ Available | Docker/containers |
-| **Vercel** | ⭐⭐⭐ | Generous | ✅ Available | Serverless functions |
 
 ---
 
