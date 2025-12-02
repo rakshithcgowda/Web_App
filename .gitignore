@@ -26,6 +26,6 @@ dist-ssr
 .vercel
 
 # Vercel deployment folders (generated during build)
-# Only ignore root-level api/ and server/, not backend/api/ or backend/server/
-/api/
+# Note: /api/index.ts should be committed for Vercel serverless functions
+# Only ignore generated files, not source files
 /server/
