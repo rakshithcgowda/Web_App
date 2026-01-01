@@ -16,7 +16,12 @@ export function RichTextEditor({ value, onChange, placeholder = "Enter explanato
 
   useEffect(() => {
     if (editorRef.current) {
-      editorRef.current.innerHTML = value || '';
+      // Only update innerHTML when the external `value` actually differs
+      // from the current editor content. This prevents resetting the
+      // selection/caret while the user is typing.
+      if (editorRef.current.innerHTML !== (value || '')) {
+        editorRef.current.innerHTML = value || '';
+      }
     }
   }, [value]);
 

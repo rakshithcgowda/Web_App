@@ -92,6 +92,23 @@ export function PreambleSection({ data, onChange }: PreambleSectionProps) {
           />
         </div>
 
+        {/* Reference Number */}
+        <div className="form-group border-l-4 border-blue-500 pl-4 bg-blue-50/30 py-2">
+          <label htmlFor="refNumber" className="form-label text-lg font-bold text-blue-900 flex items-center">
+            Reference Number *
+            <span className="ml-2 text-xs font-normal text-blue-600">(Used as filename and for saving)</span>
+          </label>
+          <input
+            type="text"
+            id="refNumber"
+            className="form-input h-12 text-base border-blue-200 focus:border-blue-500 focus:ring-blue-100"
+            placeholder="Enter BQC Reference Number (e.g. BQC/2026/001)"
+            value={data.refNumber}
+            onChange={(e) => onChange({ refNumber: e.target.value })}
+          />
+          <p className="mt-1 text-sm text-blue-600">This field is mandatory for saving or generating the document.</p>
+        </div>
+
         {/* Tender Type */}
         <div className="form-group">
           <label htmlFor="tenderType" className="form-label text-lg">
